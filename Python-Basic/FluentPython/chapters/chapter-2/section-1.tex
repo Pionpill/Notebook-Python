@@ -1,0 +1,389 @@
+\chapter{数据结构}
+\section{序列组成的数组}
+\subsection{内置序列类型概览}
+
+首先复习几个基础概念，可将 Python 基础数据类型分为以下两序列类：
+
+\begin{itemize}
+    \item \textbf{容器序列}
+    
+    list、tuple、collections.deque
+    \item \textbf{扁平序列}
+    
+    str、bytes、bytearray、memoryview、array.array
+\end{itemize}
+
+容器序列存放的时它们所包括的任意类型的对象的引用，扁平序列李存放的是值而不是引用。换句话说，扁平序列其实是一段连续的内存空间，扁平序列其实更加紧凑，但是它里面只能存放诸如字符，字节和数值这种基础类型。
+
+同时，序列类型还能按照能否被修改来分类。
+
+\begin{itemize}
+    \item \textbf{可变序列}
+    
+    list、bytearray、array.array、collections.deque、memoryview
+
+    \item \textbf{不可变序列}
+    
+    tuple、str、bytes
+\end{itemize}
+
+下图显示了可变序列(MutableSequence)与不可变序列(Sequence)的继承关系。虽然内置的序列类型不是直接继承自这两个抽象类，但了解这些基类可以帮助我们理解那些完整的序列类型包含了哪些功能。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (container) at (0,4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Container} \\
+                \midrule
+                \textrm{\_\_contains\_\_ } 
+            \end{tabular}
+        };
+
+        \node (iterable) at (0,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Iterable} \\
+                \midrule
+                \_\_iter\_\_
+            \end{tabular}
+        };
+
+        \node (sized) at (0,0) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Sized} \\
+                \midrule
+                \_\_len\_\_
+            \end{tabular}
+        };
+
+        \node (sequence) at (6,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Sequence} \\
+                \midrule
+                \_\_getitem\_\_ \\
+                \_\_contains\_\_ \\
+                \_\_iter\_\_ \\ 
+                \_\_reversed\_\_ \\
+                index \\
+                count
+            \end{tabular}
+        };
+
+        \node (mutableSequence) at (12,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{MutableSequence} \\
+                \midrule
+                \_\_setitem\_\_ \\
+                \_\_delitem\_\_ \\
+                insert \\
+                append \\
+                reversed \\
+                extend \\
+                pop \\
+                remove \\
+                \_\_iadd\_\_ 
+            \end{tabular}
+        };
+
+        \begin{scope}
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (sequence) -- (container);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (sequence) -- (iterable);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (sequence) -- (sized);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (mutableSequence) -- (sequence);
+        \end{scope}
+    \end{tikzpicture}
+    \caption{序列继承关系}
+    \label{序列继承关系}
+\end{figure}
+
+\subsection{列表推导和生成器表达式}
+
+列表推导是构建列表(list)的快捷方式，生成器表达式可以用来创建其他任何类型的序列。
+
+\subsubsection{列表推导和可读性}
+
+下面两种写法分别用常规方法和列表推导创建了新的列表，可以看出使用列表推导更加方便。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-1.py}
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-2.py}
+
+列表推导有时也可能被滥用，使得代码可读性极差。通常的原则是：只用列表推导来创建新的列表，并且保证尽量精简。如果列表推导代码超过了两行，那可以考虑用外部 for 循环来替代了。
+
+在 Python 2.x 版本中，列表推导可能会造成变量泄泄漏的问题，即在列表推到中使用到的变量会影响到列表推导外的变量。不过在 python3.x 中已经修复了这一问题，列表推导中的变量将被视为局部变量。
+
+\subsubsection{列表推导进阶用法}
+
+列表推导可以帮助我们把一个序列或者其他可迭代类型的元素进行过滤或加工，再生成一个新的列表。使用 Python 内置的 filter，map 结合 lambda 表达式也可以达到类似的效果，但语法比较复杂，可读性很差。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-3.py}
+
+并且在上述代码中，使用列表推导的速度不一定比map/filter 组合慢。
+
+同样的，列表推导中也可以嵌套循环，其作用和在外部使用 for 循环类似，下面是书上的例子。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-4.py}
+
+\subsubsection{生成器表达式}
+
+列表推导的作用只有一个：生成列表。如果需要生成其他类型的序列，需要用到生成器表达式。虽然列表推导也可以间接创建元组等其他序列，但在内部处理过程中，列表推导会创建一个完整的列表，再将其传递到某个构造函数中。生成器表达式则不同，生成器表达式遵循了迭代式协议，可以逐个产出元素，这显然对内存更加友好。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-5.py}
+
+在创建 sen 的过程中，在第二个参数(即生成器表达式)外部加了一个括号，这是因为：如果生成器表达式时一个函数调用过程中的唯一参数，那么不需要格外括号，否则需要。
+
+下面给出一个笛卡尔积的例子：
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-6.py}
+
+在上述例子中，生成器表达式并不会在内存中留下一个有 6 个组合的列表，因为生成器表达式会在每次 for 循环运行时才生成一个组合。如果数据量更大，这样处理的优势将更加明显。
+
+\subsection{元组不仅是不可变列表}
+\subsubsection{元组和记录}
+
+元组其实是对数据的记录：元组中的每个元素都存放了记录中一个字段的数据，外加这个字段的位置。正式位置信息给数据赋予了意义。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-7.py}
+
+\subsubsection{元组拆包}
+ 
+在例2-7第3行，我们指用一步就将 ('Tokyo', 2003, 32450, 0.66, 8014) 赋值给了 city, year, pop, chg, area 五个变量。同样在第7行，一个 \% 运算符就把 passport 元组里的元素对应到了 print 函数的格式化字符串中。这都是元组拆包。
+
+元组拆包可用在任何可迭代对象中，唯一硬性要求是：被可迭代对象中的元素数量必须要跟接受这些元素的元组空挡数一致。除非采用 * 表示忽略多余元素\footnote{后文将详细讲解}。下面是几种元组拆包的方法：
+
+\begin{itemize}
+    \item \textbf{平行赋值}
+    
+    平行赋值也即例2-7第3行用到的方法，即把一个可迭代对象里的元素，一并赋值到由对应的变量组成的元组中：
+
+    \begin{python}
+lax_coordinate = (33.95,-118.40)
+latitude,longitude = lax_coordinate
+    \end{python}
+
+    \item \textbf{交换变量}
+    
+    利用这种思想可以在不添加中间变量交换变量值
+
+    \begin{python}
+a,b = b,a
+    \end{python}
+
+    
+    \item \textbf{\_占位符}
+    
+    \begin{python}
+        import os
+        _,filename = os.path.spilt('/home/pionpill/.ssh/idrsa.pub')
+    \end{python}
+    
+    python 许多函数返回值为元组，那么我们就可以使用平行赋值的方法获取其中的元素，对不感兴趣的元素可以使用 \_ 占位符。
+    
+    \item \textbf{*拆包}
+
+    * 的一个用法是把可迭代对象拆开作为函数参数
+
+    \begin{python}
+t = (20,8)
+div(*t)     # 等同于 div(20,8)
+    \end{python}
+
+    此外，*args 也可用于获得不确定数量的参数，以列表形式返回。
+
+    \begin{python}
+a,b,*rest = range(5)    # a,b,*rest 分别为 (0,1,[2,3,4])
+a,b,*rest = range(3)    # a,b,*rest 分别为 (0,1,[2])
+a,b,*rest = range(2)    # a,b,*rest 分别为 (0,1,[])
+    \end{python}
+
+    在平行赋值中，*前缀只能出现在一个变量名前，但可以出现在任意位置
+
+    \begin{python}
+a,*body,c,d = range(5)  # (0,[1,2],3,4)
+    \end{python}
+
+\end{itemize}
+
+\subsubsection{嵌套元组拆包}
+
+接受表达式的元组可以是嵌套的，只要这个接受元组的嵌套结构符合表达式本身的嵌套结构。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-8.py}
+
+上例第8行，将元组中最后一个元素拆包到由变量构成的元组里，这样就获得了坐标。
+
+\subsubsection{具名元组}
+
+collections.namedtuple 是一个工厂函数，可以用来构建一个带字段名的元组和一个有名字的类。且用 namedtuple 构建的类的实例消耗的内存和元组是一样的。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-9.py}
+
+在上例中，第4行创建一个具名元组需要两个参数，一个是类名，另一个是各个字段的名字。后者可以是由数个字符串组成的可迭代对象，或者是由空格分开的字符名组成的字符串。
+
+除了从最普通元组那里继承来的属性外，具名元组还有一些自己专有的属性。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-10.py}
+
+下面结合上例对几个常用的属性解释：
+\begin{itemize}
+    \item \_fields 属性
+    
+    第5行，返回一个元组，包含类中的所有字段名
+
+    \item \_make() 方法
+    
+    第9行，接收一个可迭代对象生成这个类的一个实例，相当于 City(*delhi\_data)。
+    
+    \item \_asdict() 方法
+    
+    将具名元组以 collections.OrderedDict 形式返回，结合 item() 以列表形式返回。
+\end{itemize}
+
+\subsubsection{作为不可变列表的元组}
+
+元组与列表非常相似，除了跟增减方法有关的方法外，元组支持列表的其他所有方法\footnote{具体的方法见书}。这其中有一个列外：元组没有 \_\_reversed\_\_ 方法，但这并不妨碍对元组使用 reversed(tuple) 方法，因为\_\_reversed\_\_ 方法仅是实现 reversed() 的一种优化内置函数。
+
+\subsection{切片}
+
+切片的基础知识这里不再讲解，读者可以自行阅读书2.4.1-2.4.2,2.4.4 的内容。
+
+\subsubsection{多维切片和省略}
+
+[]除了一维的切片运算，还可以使用以逗号分开的多个索引或者是切片。例如 Numpy 中二维的 numpy.ndarray 就用到了 a[i,j] 抑或是 a[m:n,k:l] 的形式。
+
+要正确处理这种 [] 运算符的话，对象的特殊方法 \_\_getitem\_\_ 和 \_\_setitem\_\_ 需要以元组的形式来接收 a[i,j] 中的索引。也就是说，如果要得到 a[i,j] 的值，Python 会调用 a.\_\_getitem\_\_((i,j))。
+
+省略(ellipsis)的写法是...(三个英文句号)。省略在 Python 解析器中是一个符号，实际上它是 Ellipsis 对象的别名，Ellipsis 对象是 ellipsis 类的单一实例。它可以用作切片规范的一部分或函数清单中，例如在 Numpy 中对某个思维数组 x 采用 x[1,...] 操作等同于 x[1,:,:,:]。
+
+\subsection{对序列使用 + 和 *}
+
+通常+号两侧的序列由相同类型的数据所构成，在拼接过程中，两个操作的序列都不会被修改，Python会新建一个包含同样类型数据的序列来作为拼接的结果。
+
++ 和 * 都遵守这个规则，不修改原有的操作对象，而是构建一个全新的序列。
+
+如果在 a*n 这个语句中，序列 a 里的元素是对其他可变对象的引用的话，就会出问题，如下面例子。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-12.py}
+
+在上面这个例子中第 7 行我们会发现，对 board[0][0] 的修改导致每列第一个值都进行了修改。这是因为当 a*n 语句中 a 中元素为引用时，列表新增元素也将指向这个引用\footnote{内部原理将在后续章节讲解}。
+
+上述例子的写法等同于下例：
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-13.py}
+
+\subsection{序列的增量赋值}
+
+增量赋值运算符 += 和 *= 的表现取决于它们的第一个操作对象。下面只讨论 +=。
+
++= 背后的方法是 \_\_iadd\_\_。表示就地加法，但是如果没有实现该方法，将会退一步调用 \_\_add\_\_，得到一个新的对象，再赋值给原对象。也就是说在表达式中，变量名会不会关联到新的对象，完全取决于这个类型有没有实现 \_\_idd\_\_ 方法。
+
+总的来说，可变序列都实现了 \_\_iadd\_\_ 方法，而不可变序列根本就不支持这个操作。
+
+\begin{python}
+l = (1,2,3)
+id1 = id(l)
+l *= 2
+id2 = id(l)
+id1 == id2          # False
+l = [1,2,3]
+id1 = id(l)
+l *= 2
+id2 = id(l)
+id1 == id2          # True
+\end{python}
+
+\textbf{一个关于 += 的谜题}
+
+运行下列代码：
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-14.py}
+
+上述代码运行时会报错，但同时元组 a 将会改变\footnote{如果调用 a[2].extend([50,60])}就能避免异常。如果我们利用 dis 查看汇编过程会发现，在上述代码运行过程中，先对 a[2] 指向的列表进行了修改，再将该列表传给了 a[2]。在传递过程中，由于元组不可被修改，故报错，但在实际打印 a 的值时，a[2] 所指向的列表却发生了改变。总结如下：
+
+\begin{itemize}
+    \item 不要把可变对象放在元组里。
+    \item 增量赋值不是一个原子操作。就像这里即使抛出异常，却完成了操作。
+    \item 这种情况很罕见，原作者15 年 Python生涯都没遇到过。
+\end{itemize}
+
+\subsection{list.sort 方法和内置函数 sorted}
+
+list.sort 会就地排序，不会把原列表复制一份。这也是这个方法返回值是 None 的原因\footnote{Python惯例：一个函数或方法对对象就行就地改动，那它的返回值应该是 None}。与之相对的，内置函数 sorted 会新建一个列表作为返回值。这个方法可以接收任何形式的可迭代对象作为参数\footnote{甚至有些不可迭代对象，后文将提到}。
+
+这两个方法/函数都有两个可选的关键字参数：
+\begin{itemize}
+    \item \textbf{reverse}
+    
+    如果被设定为 True，将降序排列，默认为 False。
+    
+    \item \textbf{key}
+    
+    一个只有一个参数的函数，这个函数会被用在序列里的每一个元素上，所产生结果是排序算法依赖的对比关键字。比如说用 key=str.lower 来实现忽略大小写排序。默认为恒等函数，即元素本身的值。
+\end{itemize}
+
+\subsection{用 bisect 来管理已排序的序列}
+
+bisect 模块包括两个主要函数，bisect 和 insort，两个函数都利用二分查找算法来在有序序列中查找或插入元素。
+
+\subsubsection{用 bisect 来搜索}
+
+\texttt{bisect(haystack,needle)} 在 \texttt{haystack}(干草垛)里搜索 \texttt{needle}(针) 的位置，该位置曼珠的条件为：将 \texttt{needle} 插入这个位置后，\texttt{haystack} 仍然保持升序\footnote{前提是haystack是有序序列。}。
+
+如果需要进行排序操作，可以使用 \texttt{bisect(haystack,needle)} 来查找位置 \texttt{index}，再用 \texttt{haystack.insert(index,needle)} 插入新值。当然也可以使用 \texttt{insort} 一步到位。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-17.py}
+
+bisect 还有两个可选参数，\texttt{lo},\texttt{hi} 用来搜小搜寻范围，lo 默认值是 0，hi默认值是序列长度。
+
+其次，\texttt{bisect} 函数其实是 \texttt{bisect\_right} 函数的别名，对应的还有一个 \texttt{bisect\_left} 函数，在 \texttt{bisect\_left} 函数中，插入的值若与原序列中某个值相同时，会被放在左边。
+
+下面给出了一个 \texttt{bisect} 函数的实用例子：
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-18.py}
+
+\subsubsection{用 bisect.insort 插入新元素}
+
+\texttt{insort(seq,item)} 把变量 \texttt{item} 插入到序列 \texttt{seq} 中，并且能保持 \texttt{seq} 升序顺序。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-19.py}
+
+与 \texttt{bisect} 类似的，\texttt{insort} 也有 \texttt{lo} 和 \texttt{hi} 两个可选参数来控制查找范围，\texttt{insort} 也有个变体叫 \texttt{insort\_left}。
+
+目前提到的内容不仅适用于列表或元组，还可用于几乎所有的序列类型。
+
+\subsection{当列表不是首选}
+
+虽然列表灵活又简单，但只需要处理数字列表的话，会有更好的选择。比如存放 100万的浮点数时，使用数组(\texttt{array}) 效率要高得多，因为数组存放的并不是浮点数对象，而是数字的机器翻译，也就是字节表述\footnote{这和 C 语言处理数组一样}。
+
+\subsubsection{数组}
+
+如果只需要包含数字的列表，那么 \texttt{array.array} 比 list 更高效。数组支持所有和可变序列有关的操作。另外，数组还提供从文件读取和存入文件的更快的方法。
+
+Python 数组和 C 语言一样，创建数组需要一个类型码，这个类型码规定了在底层的 C 语言应该处理什么样的数据类型。这样可以节省很多空间。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-20.py}
+
+在书上示例中，还用到了处理数据文件的方法，使用二进制方式存储文件即节省了空间，Python 在处理二进制文件时读取速度相较文本文件也快许多。
+
+\subsubsection{内存视图}
+
+\texttt{memoryview} 是一个内置类，它能让用户在不复制内容的情况下操作同一个数组的不同切片。
+
+\texttt{memoryview.cast} 的概念跟数组模块类似，能用不同的方式读写同一块内存数据，而且内容不会随意移动，这听上去和 C 语言的强制类型转化概念相似。\texttt{memoryview.cast} 会把同一块内存里的内容打包成一个全新的  \texttt{memoryview} 对象给你。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-21.py}
+
+如果要进行高级的数据处理，那可以继续学习 NumPy 和 SciPy 两个外部库。
+
+\subsubsection{双向列表和其他形式的队列}
+
+利用 \texttt{.append} 和 \texttt{.pop} 方法，列表也能实现栈或者队列的操作。但是删除列表的第一个元素抑或是在列表后面添加元素之类的操作时很耗时的，因为这些操作会牵扯到移动列表中的所有操作。
+
+collections.deque 类(双向队列)是一个线程安全，可以快速从两端添加或删除元素的数据类型。在新建双向队列时，可以指定队列大小，如果队列满员了，还可以从方向端删除过期的元素，然后再尾端添加新的元素。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/2-23.py}
+
+双向队列实现了大部分列表所拥有的方法，也有一些格外的符合自身设计的方法，比如 \texttt{popleft}，\texttt{rotate}。但是为了实现这些操作，双向队列也付出了一定代价，从队列中间删除元素的操作会慢一些，因为它只在对头部的操作进行了操作。
+
+除了 deque 之外，Python 标准库还提供了其他几种对队列的实现，这里不再一一解释。如 \texttt{queue},\texttt{multiprocessing},\texttt{asyncio},\texttt{heapq}。
+
+\newpage

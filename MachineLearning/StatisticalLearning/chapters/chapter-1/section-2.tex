@@ -1,0 +1,70 @@
+\section{感知机}
+
+感知机(perceptron)是\textbf{二类分类}的\textbf{线性分类}模型，其输入为实例的特征向量，输出为实例的类别，取 +1 和 -1 二值。感知机是神经网络与支持向量机的基础。
+
+\subsection{感知机模型}
+
+\begin{definition}[感知机]
+    假设输入空间(特征空间)是 $\mathcal{X} \subseteq \mathbf{R}^n$，输出空间是 $y = \{+1,-1\}$。输入 $x \in \mathcal{X}$ 表示实例的特征向量，对应输入空间(特征空间)的点；输出 $y \in \mathbf{Y}$ 表示实例的类别。由输入空间到输出空间的如下函数：
+    \begin{equation}
+        f(x) = \text{sign} (\omega \cdot x + b)
+    \end{equation}
+    称为感知机，其中，$\omega$和$b$为感知机模型参数，$\omega \in \mathbf{R}^n$ 叫作权值(weight)或权值向量(weight vector)，$b\in \mathbf{R}$叫作偏置(bias)，$\omega \cdot x$表示内积。sign 是符号函数，即
+    \begin{equation}
+        sign(x) = \left\{ 
+            \begin{aligned}
+                +1,x\geq 0 \\
+                -1,x<0 
+            \end{aligned}
+        \right.
+    \end{equation}
+\end{definition}
+
+感知机是一种\textbf{线性分类模型}，属于判别模型。感知机的假设空间是定义在特征空间中的所有线性分类模型或线性分类器。即函数集合 $\{f|f(x) = \omega \cdot x + b\}$。
+
+感知机有如下几何解释：线性方程 
+\begin{equation}
+    \omega \cdot x + b = 0
+\end{equation}
+
+对应于特征空间 $\mathbf{R}^n$ 中的一个超平面 $S$，其中$\omega$是超平面的法向量，$b$ 是超平面的截距。这个超平面被分为将特征空间划分为两个部分。位于两部分的点(特征向量)分别被分为正负两类。因此，超平面 $S$ 称为分离超平面：
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[every node/.style = {node font = \small}]
+        \draw [->,>=Stealth] (0,0) -- (6,0) node [at end,below] {$x^{(1)}$};
+        \draw [->,>=Stealth] (0,0) -- (0,4) node [at end,left] {$x^{(2)}$};
+        \draw [red] (0,3) -- (5,0) 
+            node [pos = 0.8,right = 1em] {$\omega \cdot x + b=0$}
+            node [pos = 0,left] {$b$};
+        \draw [blue,->,>=Stealth] (4,0.6) -- (5,2.25) node [at end,right] {$\omega$};
+        \draw [orange] (0,0) -- (1.32,2.2) node [midway,right] {$x = -\frac{b}{||\omega||}$};
+    \end{tikzpicture}
+    \caption{感知机模型}
+    \label{感知机模型}
+\end{figure}
+
+\subsection{感知机学习策略}
+\subsubsection{数据集的线性可分性}
+
+\begin{definition}[数据集的线性可分性]
+    给定一个数据集：
+    \[T = \{ (x_1,y_1),(x_2,y_2),\cdots,(x_N,y_N) \}\]
+    其中，$x_i \in \mathcal{X} = \mathbf{R}^n, y_i \in \mathbf{Y} = {+1,-1}$ 如果存在某个超平面 $S$ 能够将数据集的正实例点和负实例点完全正确地划分到超平面的两侧，即对所有 $y_i = +1$ 的实例 $i$，有 $\omega \cdot x + b>0$，对所有 $y_i = -1$ 的实例 $i$，有 $\omega \cdot x + b<0$，则称数据集 $T$ 为线性可分数据集；否则，称数据集 $T$ 线性不可分。
+\end{definition}
+
+\subsubsection{感知机学习策略}
+假设训练数据集是线性可分的，感知机学习目标是求得能够将数据集的正实例点和负实例点完全正确地划分的超平面。也即求得感知机的模型参数 $\omega,b$。需要确定一个学习策略，即\textbf{定义(经验)损失函数并将损失函数极小化}。
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage

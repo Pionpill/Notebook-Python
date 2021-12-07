@@ -1,0 +1,273 @@
+\chapter{把函数视作对象}
+
+在 Python 中，函数是一等对象。编程语言理论家定义一等对象如下：
+\begin{itemize}
+    \item 在运行时创建
+    \item 能赋值给变量或数据结构中的元素
+    \item 能作为参数传给函数
+    \item 能作为函数的返回结果
+\end{itemize}
+
+\section{一等函数}
+\subsection{把函数视作对象}
+
+观察下面这个求阶乘的函数：
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-1.py}
+
+其中，\texttt{\_\_doc\_\_} 属性用于生成对象的帮助文本。从 \texttt{type()} 函数的返回值可知，我们创建的 \texttt{factorial()} 函数是 \texttt{function} 类的实例。
+
+下面例子展现了函数对象的``一等''本性。我们可以把 \texttt{factorial} 函数赋值给变量 \texttt{fact}，然后通过变量名调用。我们还能把它作为参数传给 \texttt{map} 函数。\texttt{map} 函数返回一个可迭代对象，里面的元素是把第一个参数(一个函数)应用到第二个参数(一个可迭代对象)中各个元素上得到的结果。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-2.py}
+
+\subsection{高阶函数}
+
+接受函数作为参数，或者把函数作为结果返回的函数是高阶函数。 \texttt{map} 函数就是一个例子，此外内置的 \texttt{sorted} 函数也是，可选的 \texttt{key} 参数用于提供一个函数，应用到各个元素上进行排序。任何单参数函数都能作为 \texttt{key} 参数的值。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-3.py}
+
+在函数式编程规范中，最为人知的高阶函数有 map,filter,reduce。
+
+\noindent\textbf{map,filter,reduce 的现代替代品}
+
+在 Python 3 中 \texttt{map} 和 \texttt{filter} 还是内置函数，使用列表推导和生成器表达式可以在绝大多数情况下替代这两个高阶函数，而且可读性更高。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-5.py}
+
+我们可以看到让表达式复杂后，使用列表推导可读性高了许多，并避免了 \texttt{lambda} 表达式的使用。
+
+高阶函数 \texttt{reduce} 在 Python 2 中是内置函数，在 Python3 中被移到了 \texttt{functools} 模块中，多数情况下更加推荐使用 \texttt{sum} 函数。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-6.py}
+
+\texttt{sum} 和 \texttt{reduce} 的通常思想是把某个操作连读应用到序列的元素上，累计之前的结果，把一个系列值归约成一个值。与之类似的还有 \texttt{all} 和 \texttt{any} 两个内置归约函数。 
+
+\subsection{匿名函数}
+
+\texttt{lambda} 关键字在 Python 表达式内创建匿名函数。由于 Python 句法非常简单，导致 \texttt{lambda} 函数的定义体只能使用纯表达式。
+
+在参数列表中最适合使用匿名函数。除此以外，不建议写复杂的 \texttt{lambda} 表达式，因为要么 Python 写不出来，就算写出来了，可读性也很差。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-7.py}
+
+\texttt{lambda} 表达式和 \texttt{def} 函数一样会创建函数对象。
+
+\subsection{可调用对象}
+
+除了用户定义的函数，调用运算符()还可以应用到其他对象上。如果想判断对象能否调用，可以使用内置的 \texttt{callable()} 函数。Python 数据模型文档列出了 7 种可调用对象。
+
+\begin{itemize}
+    \item \textit{用户定义的函数} \\
+    使用 \texttt{def} 语句或 \texttt{lambda} 表达式创建。
+    \item \textit{内置函数} 
+    \item \textit{内置方法} 
+    \item \textit{方法} \\
+    在类的定义体中定义的函数。
+    \item \textit{类} \\
+    调用类时会运行类的 \texttt{\_\_new\_\_} 方法创建一个实例，然后运行 \texttt{\_\_init\_\_} 方法，初始化实例，最后把实例返回给调用方。因为 Python 没有 new 运算符，所以调用类相当于调用函数。
+    \item \textit{类的实例} \\
+    如果类定义了 \texttt{\_\_call\_\_} 方法，那么它的实例可以作为函数调用。下一节将说明。
+    \item \textit{生成器函数} \\
+    使用 \texttt{yield} 关键字的函数或方法。调用生成器函数返回的是生成器对象。生成器函数在很多方面与其他可调用对象不同，后文将说明。
+\end{itemize}
+
+\subsection{用户定义的可调用类型}
+
+任何 Python 对象都可以表现得像函数。为此，只需实现实例方法 \texttt{\_\_call\_\_}。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-8.py}
+
+实现 \texttt{\_\_call\_\_} 方法的类是创建函数类对象的简便方式，此时必须在内部维护一个状态，让它在调用之前可用。
+
+\subsection{函数内省}
+
+除了 \texttt{\_\_doc\_\_}，函数对象还有很多属性。使用 \texttt{dir} 函数可以探知某个函数对象所具备的属性。
+
+先讨论 \texttt{\_\_dict\_\_} 内置函数。与用户定义的常规类一样，函数使用 \texttt{\_\_dict\_\_} 属性存储赋予它的用户属性。这相当于一种基本形式的注解。
+
+下面重点说明函数专有而用户定义的一般对象没有的属性。计算两个属性集合的差便可获得函数专有的属性列表。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-9.py}
+
+这些内置函数的意义如下：
+\begin{table}[H]
+    \centering
+    \caption{函数特有的内置函数}
+    \label{table:函数特有的内置函数}
+    \setlength{\tabcolsep}{4mm}
+    \begin{tabular}{c|c|cc}
+        \toprule
+        \textbf{名称} & \textbf{类型} & \textbf{说明} \\
+        \midrule
+        \texttt{ \_\_annotations\_\_ } & dict & 参数和返回值的注解 \\
+        \texttt{ \_\_call\_\_ } & method-wrapper & 实现 () 运算符，即可调用对象协议 \\
+        \texttt{ \_\_closure\_\_ } & tuple & 函数闭包，即自由变量的绑定 \\
+        \texttt{ \_\_code\_\_ } & code & 编译成字节码的函数元数据和函数定义体 \\
+        \texttt{ \_\_defaults\_\_ } & tuple & 形式参数的默认值 \\
+        \texttt{ \_\_get\_\_ } & method-wrapper & 实现只读描述符协议 \\
+        \texttt{ \_\_globals\_\_ } & dict & 函数所在模块中的全局变量 \\
+        \texttt{ \_\_kwddefaults\_\_ } & dict & 仅限关键字形式参数的默认值 \\
+        \texttt{ \_\_name\_\_ } & str & 函数名 \\
+        \texttt{ \_\_qualname\_\_ } & str & 函数的限定名称 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{从定位参数到仅限关键字参数}
+
+Python 最好的特征之一是提供了极为灵活的参数处理机制，而且 Python3 进一步提供了仅限关键字参数。与之密切相关的是，调用函数时使用 * 和 ** ``展开'' 可迭代对象，映射到单个参数。
+
+下面介绍 Python 的四种参数类型\footnote{这些内容为本人添加，原书并没有。}。
+
+\begin{itemize}
+    \item \textit{默认参数} \\
+    默认参数，注意一点：必选参数在前，默认参数在后，否则Python的解释器会报错。
+    \item \textit{可变参数} \\
+    可变参数，意思就是传入参数的个数是可变的，可以是1个，2个，无数个；传入参数类型为list或者tuple。
+    如果已经存在一个数组了，如 i = [1,2,3]，传参的时候前面加上*就行，*i表示把i这个数组所有元素作为可变参数传进去。
+\begin{python}
+def calc(*numbers):
+    sum=0
+    for n in numbers:
+        sum= sum+n*n
+    return sum
+
+calc(1,2,3)  # 14
+calc(*[1,2,3]) # 14
+\end{python}
+    \item \textit{关键字参数} \\
+    关键字参数允许你传入0个或任意个含参数名的参数，0意味着关键字参数可填可不填，这些关键字参数在函数内部自动组装为一个dict。关键字参数需要在参数名前加 **。同样，如果需要传入字典，传参的时候前面要加上 **。
+
+\begin{python}
+def student(name,age,**interest):
+    print('name:',name,' age:',age,' interest:',interest)
+
+student('wang',21,sports='football')
+# name: wang age:21 interest:{'sports':'football'}
+\end{python}
+
+    \item \textit{仅限关键字参数} \\
+    关键字参数，对于传入的参数名无法限制。如果想对参数名有限制，就用到了仅限关键字参数。仅限关键字参数需要一个特殊分隔符*，*后面的参数被视为命名关键字参数。
+\begin{python}
+def f(a,*,b):
+    return a,b
+
+f(1,b=2)    # (1,2)
+\end{python}
+
+\end{itemize}
+
+下面给出书上一个例子：
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-10.py}
+
+\subsection{获取关于参数的信息}
+
+函数对象有个 \texttt{\_\_defaults\_\_} 属性，它的值是一个元组，里面保存着定位参数和关键字参数的默认值。仅限关键字参数的默认值在 \texttt{\_\_kwddefaults\_\_} 属性中。参数的名称在 \texttt{\_\_code\_\_} 属性中，它的值是一个 \texttt{code} 对象引用，自身也有很多属性。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-15.py}
+
+通过 \texttt{code} 的确能查看一些函数的信息，但是这不是很便利。使用 \texttt{inspect} 模块将更方便。 
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-17.py}
+
+这样就方便许多，\texttt{inspect.signature} 函数返回一个 \texttt{inspect.Signature} 对象，他有一个 \texttt{parameters} 属性，是一个有序映射，把参数名和 \texttt{inspect.Parameters} 对象对应起来。各个 \texttt{Parameter} 属性也有自己的属性，例如 \texttt{name},\texttt{default}和 \texttt{kind}。特殊的 \texttt{inspect.\_empty} 值表示没有默认值，考虑到 \texttt{None} 是有效的默认值。
+
+\texttt{kind} 属性的值是 \texttt{\_ParameterKind} 类中的5个值之一:
+\begin{itemize}
+    \item \texttt{POSITIONAL\_OR\_KEYWORD} \\
+    可以通过定位参数和关键字参数传入的形参。
+    \item \texttt{VAR\_POSITIONAL} \\
+    定位参数元组。
+    \item \texttt{VAR\_KEYWORD} \\
+    关键字参数字典。 
+    \item \texttt{KEYWORD\_ONLY} \\
+    仅限关键字参数。
+    \item \texttt{POSITIONAL\_ONLY} \\
+    仅限定位参数。
+\end{itemize}
+
+除此以外，\texttt{inspect.Parameter} 对象还有一个 \texttt{annotation} 属性，可能包含 Python3 新的注解句法提供的函数签名元数据。
+
+\subsection{函数注解}
+
+Python3 提供了一种句法，用于为函数声明中的参数和返回值附加元数据。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-19.py}
+
+函数声明中的各个参数可以在 : 之后增加注解表达式。如果参数有默认值，注解放在参数名和 = 号之间。如果想注解返回值，在 ) 和函数声明末尾的 : 之间添加一个 -> 和一个表达式。表达式可以是任何类型，可以是最常用的类(\texttt{str},\texttt{int} 等)，也可以是字符串(如：`\texttt{int > 0}')。
+
+注解不会做任何处理，只是存储在函数的 \texttt{\_\_annotations\_\_} 属性中：
+\begin{python}
+clip.__annotations__
+# {'text':<class 'str'>, 'max_len':'int>0', 'return':<class 'str'>}
+\end{python}
+
+Python 对注解做的唯一事情就是存储在 \texttt{\_\_annotations\_\_} 属性中。仅此而已，注解对 Python 解释器没有任何意义。
+
+\subsection{支持函数式编程的包}
+
+虽然 Python 的目标不是变成函数式编程语言，但通过 \texttt{operator} 和 \texttt{functools} 等包的支持，函数式编程风格也可以信手拈来。
+
+\subsubsection{\texttt{operator} 模块}
+
+在函数式编程中，常常需要把算数运算符当作函数使用。其中的一个解决方法是使用 \texttt{lambda} 匿名函数。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-21.py}
+
+\texttt{operator} 模块提供了多个算数运算符从而避免了编写 \texttt{lambda} 表达式这样平凡的匿名函数。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-22.py}
+
+operator 模块中还有一类函数，能替代从序列中取出元素或读取对象属性的 \texttt{lambda} 表达式。下面这个例子中，根据元组的某个字段给元组列表排序。\texttt{itemgetter(1)} 等效于 \texttt{lambda item:item[1]}。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-23.py}
+
+如果把多个参数传给 \texttt{itemgetter}，它构建的函数会返回提取的值构成的元组。
+
+\begin{python}
+cc_name = itemgetter(1,0)
+for city in metro_data:
+    print(cc_name(city))
+
+# ('JP','Tokyo')
+# ......
+\end{python}
+
+\texttt{itemgetter} 使用 \texttt{[]} 运算符，因此它支持映射和任何实现 \texttt{\_\_getitem\_\_} 方法的类。
+
+\texttt{attrgetter} 与 \texttt{itemgetter} 作用类似，它创建的函数根据名称提取对象的属性。如果把多个属性名传给 \texttt{attrgetter}，它也会返回提取的值构成的元组。此外，如果参数名中包括 .(点号)，\texttt{attrgetter} 会深入嵌套对象，获取指定的属性。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-24.py}
+
+使用以下代码可以查看 \texttt{operator} 模块中的部分函数：
+\begin{python}
+[name for name in dir(operator) if not name.startswith('_')]
+# ['abs', 'add', 'and_', 'attrgetter', 'concat', 'contains', 'countOf', 'delitem', 'eq', 'floordiv', 'ge', 'getitem', 'gt', 'iadd', 'iand', 'iconcat', 'ifloordiv', 'ilshift', 'imatmul', 'imod', 'imul', 'index', 'indexOf', 'inv', 'invert', 'ior', 'ipow', 'irshift', 'is_', 'is_not', 'isub', 'itemgetter', 'itruediv', 'ixor', 'le', 'length_hint', 'lshift', 'lt', 'matmul', 'methodcaller', 'mod', 'mul', 'ne', 'neg', 'not_', 'or_', 'pos', 'pow', 'rshift', 'setitem', 'sub', 'truediv', 'truth', 'xor']
+\end{python}
+
+这其中大部分函数作用不言而喻，以 \texttt{i} 开头，后面是另一个运算符的那些名称对应的是增量运赋值运算符。如果第一个参数是可变的，那么这些运算符函数就会修改它；否则，作用就与不带 \texttt{i} 的函数一样。
+
+最后介绍一个 \texttt{methodcaller}，它会自行创建函数。\texttt{methodcaller} 创建的函数会在对象上调用参数指定的方法。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-25.py}
+
+\subsubsection{使用 \texttt{functools.partial} 冻结参数}
+
+\texttt{functools} 提供了一系列高级函数，除 \textrm{reduce} 外，最有用的是 \texttt{partial} 以及其变体 \texttt{partialmethod}。
+
+\texttt{functools.partial} 这个高阶函数用于部分应用一个函数。部分应用指的是，基于一个函数创建一个新的可调用对象，把原函数的某些参数固定。使用这个函数可以把接受一个或多个参数的函数改编成需要回调的 API，这样参数更少。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/5-26.py}
+
+\texttt{partial} 的第一个参数是一个可调用对象，后面跟着任意个要绑定的定位参数和关键字参数。
+
+
+
+
+
+
+
+
+\newpage

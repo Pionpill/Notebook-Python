@@ -1,0 +1,310 @@
+\section{序列的修改，散列和切片}
+
+\textit{不要检查它是不是鸭子：检查它的叫声像不像鸭子，它的走路姿势像不像鸭子，等等。具体检查什么取决于你想使用语言的哪些行为。}
+
+\hfill —— Alex Martelli
+
+这一章我们会基于前面的 \texttt{Vector2d} ，向前迈出一大步，定义表示多为向量的 \texttt{Vector} 类。这个类的行为与 Python 中标准的不可变扁平序列一样。
+
+\subsection{\texttt{Vector} 类：用户定义的序列类型}
+
+我们将使用组合模式实现 \texttt{Vector} 类，而不使用继承。向量的分量存储在浮点数数组中，而且还将实现不可变扁平序列所需的方法。
+
+不过，在实现序列方法之前，我们要确保 \texttt{Vector} 类与前一章定义的 \texttt{Vector2d} 类兼容，除非有些地方让二者兼容没有什么意义。
+
+\subsection{\texttt{Vector} 类第1版：与 \texttt{Vector2d} 兼容}
+
+我们会故意不让 \texttt{Vector} 的构造方法与 \texttt{Vector2d} 的构造方法兼容。我们让 \texttt{\_\_init\_\_} 方法接受任意个参数(通过 \texttt{*args} )。但是序列的构造方法最好接受可迭代的对象作为参数，因为所有内置的序列类型都是这样做的。下面是我们需要达到的效果：
+
+\begin{python}
+>>> Vector([3.1,4.2])
+Vector([3.1,4.2])
+>>> Vector((3,4,5))
+Vector([3.0,4.0,5.0])
+>>> Vector(range(10))
+Vector([0.0,1.0,2.0,3.0,...])
+\end{python}
+
+除了新构造方法的签名外，还确保了传入两个分量时， \texttt{Vector2d} 类的每个测试都能通过，而且得到相同的结果。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/10-2.py}
+
+其中 \texttt{reprlib.repr} 的时候需要做些说明。这个函数用于生成大型结构或递归结构的安全表达式，它会限制输出字符串的长度，用 '...' 表示截断的部分。我们实例的表示形式是 \texttt{Vector([3.0,4.0,5.0])} 这样的，而不是 \texttt{Vector(array('d',[3.0,4.0,5.0]))}，因为 \texttt{Vector} 实例中的数组是实现细节，没必要显示。
+
+编写 \texttt{\_\_repr\_\_} 方法时，本可以使用 \texttt{reprlib.repr(list(self.\_components))} 。然而，这么做有点浪费，因为要把 \texttt{self.\_components} 中的每个元素复制到一个列表中，然后使用列表的表示形式。
+
+\subsection{协议和鸭子类型}
+
+在第一章中说过，在 \texttt{Python} 中创建功能完善的序列类型无需使用继承，只需实现符合序列协议的方法。
+
+在面向对象编程中，协议是非正式的接口，只在文档中定义，在代码中不定义。例如， Python 的序列协议只需要 \texttt{\_\_len\_\_} 和 \_\texttt{\_getitem\_\_} 两个方法。任何类只要使用标准的签名和语义实现了这两个方法，就能用在任何期待序列的地方。以示例 1-1 为例：
+
+\lstinputlisting[language=Python]{../../Scripts/Introduction/1-1.py}
+
+上面例子中的 \texttt{FrenchDeck} 类能充分利用 Python 的许多功能，因为它实现了序列协议，不过代码中并没有声明这一点。任何有经验的程序员只要看一眼就知道它是序列。我们说它是序列，是因为它的行为像序列，这才是重点。
+
+协议是非正式的，没有强制力的，因此如果你知道类的具体使用场景，通常只需要实现一个协议的部分。例如，为了支持迭代，只需实现 \\texttt{\_\_getitem\_\_} 方法。
+
+\subsection{\texttt{Vector} 类第 2 版：可切片的序列}
+
+如 \texttt{FrenchDeck} 类所示，如果能委托给对象中的序列属性(如 \texttt{self.\_components} 数组)，支持序列协议特别简单。下述只有一行代码的 \texttt{\_\_len\_\_} 和 \texttt{\_\_getitem\_\_} 方法是个好的开始。
+
+\begin{python}
+class Vector:
+    # 省略很多行
+
+    def __len___(self):
+        return len(self._components)
+
+    def __getitem__(self,index):
+        return self._components[index]
+\end{python}
+
+添加这两个方法后，就能执行下列操作了：
+\begin{python}
+>>> v1 = Vector([3,4,5])
+>>> len(v1)
+3
+>>> v1[0], v1[-1]
+(3.0, 5.0)
+>>> v7 = Vector(range(7))
+>>> v7[1:4]
+>>> array('d',[1.0,2.0,3.0])
+\end{python}
+
+现在可以实现切片功能了，但是这并不完美，我们希望 \texttt{Vector} 实例的切片也是 \texttt{Vector} 实例，而不是数组。对 \texttt{Vector} 来说，如果切片生成普通的数组，将会缺失大量功能。
+
+为了实现这一目标，我们不能简单地委托给数组切片。我们要分析传给 \texttt{\_\_getitem\_\_} 方法的参数，做适当的处理。
+
+\subsubsection{切片原理}
+
+查看下面例子：
+\begin{python}
+>>> class MySeq:
+...     def __getitem__(self, index):
+...         return index    # 直接返回传给它的值
+...
+>>> s = MySeq()
+>>> s[1]    
+1
+>>> s[1:4]
+slice(1, 4, None)
+>>> s[1:4:2]
+slice(1,4,2)
+>>> s[1:4:2, 9]             # 如果 [] 中含有逗号，那么 __getitem__ 收到的是元组。
+(slice(1,4,2), 9)
+>>> s[1:4:2, 7:9]           # 元组中甚至可以有多个切片
+(slice(1,4,2), slice(7,9,None))
+\end{python}
+
+我们继续深入研究 \texttt{slice} 本身。
+
+\begin{python}
+>>> slice 
+<class 'slice'>
+>>> dir(slice)
+['__class__', '__delattr__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', 'indices', 'start', 'step', 'stop']
+\end{python}
+
+由此，我们发现 \texttt{slice} 是内置的类型，他有 \texttt{start, step, stop} 三个属性，以及 \texttt{indices} 方法。这个方法有很大作用但鲜为人知。
+
+\begin{python}
+>>> help(slice.indices)
+S.indices(len) -> (start, stop, stride)
+\end{python}
+
+给定长度为 \texttt{len} 的序列，计算 \texttt{S} 表示的扩展切片的起始( \texttt{start} ) 和结尾 ( \texttt{stop} )索引，以及步幅( \texttt{stride} )。超出边界的索引会被截掉。
+
+换句话说， \texttt{indices} 方法开放了内置序列实现的棘手逻辑，用于优雅地处理确实索引和负数索引，以及长度超过目标序列的切片。这个方法会 ``整顿'' 元组，把 \texttt{start}， \texttt{stop} 和 \texttt{stride} 都变成非负数，并且都落在指定长度序列的边界内。
+
+下面举几个例子，假设有个长度为 5 的序列，例如 'ABCDE':
+
+\begin{python}
+>>> slice(None,10,2).indices(5)     # 'ABCDE'[:10:2] 等同于 'ABCDE'[0:5:2]
+(0,5,2)
+>>> slice(-3,None,None).indices(5)  # 'ABCDE'[-3:] 等同于 'ABCDE'[2:5:1]
+(2,5,1)
+\end{python}
+
+在 \texttt{Vector} 类中无需使用 \texttt{slice.indices()} 方法，因为收到切片参数时，我们会委托 \texttt{\_components} 数组处理。但是，如果没有底层序列类型作为依靠，那么使用这个方法能节省大量时间。
+
+\subsubsection{能处理切片的 \texttt{\_\_getitem\_\_} 方法}
+
+下面给出让 \texttt{Vector} 表现为序列所需的两个方法： \texttt{\_\_len\_\_} 和 \texttt{\_\_getitem\_\_}：
+
+\begin{python}
+def __len__(self):
+    return len(self._components)
+def __getitem__(self,index):
+    cls = type(self)    # 获取实例所属类(即 Vector)
+    if isinstance(index,slice):     # 如果 index 参数是 slice 对象
+        return cls(self._components[index])     # 调用类的构造方法，使用 _components 数组的切片构建一个新 Vector 实例
+    elif isinstance(index,numbers.Integral):    # 如果 index 是 int 或其他整数类型，返回对应元素
+        return self._components[index]
+    else:                                       # 其他情况抛出异常
+        msg = '{cls.__name__} indices must be integers'
+        raise TypeError(msg.format(cls=cls))
+\end{python}
+
+\subsection{\texttt{Vector} 类第3版：动态存取属性}
+
+\texttt{Vector2d} 变成 \texttt{Vector} 之后，就没办法通过名称访问向量的分量了(如 \texttt{v.x}，\texttt{v.y})。现在我们处理的向量可能有大量分量。不过，弱能通过单个字母访问前几个分量的话比较方便。比如，用 \texttt{x,y,z} 代替 \texttt{v[0],v[1],v[2]}。
+
+当我们查找某一属性查找失败后，解释器会调用 \texttt{\_\_getattr\_\_} 方法。简单来说，对 \texttt{my\_obj.x} 表达式，Python 会检查有没有名为 \texttt{x} 的属性；如果没有，到类中(my\_obj.\_\_class\_\_)查找；如果还没有，顺着继承树继续查找。\footnote{属性查找机制非常复杂，会在后面章节说明。}如果依旧找不到，调用 \texttt{my\_obj} 所属类中定义的 \texttt{\_\_getattr\_\_} 方法，传入 \texttt{self} 和属性名称的字符串形式(如 `\texttt{x}')。
+
+下面是为 \texttt{Vector} 定义的 \texttt{\_\_getattr\_\_} 方法。这个方法的作用很简单，它检查所查找的属性是不是 \texttt{xyzt} 中的某个字母，如果是，则返回对应分量。
+
+\begin{python}
+shortcut_names = 'xyzt'
+
+def __getattr__(self,name):
+    cls = type(self)
+    if len(name) == 1:
+        pos = cls.shortcut_names.find(name)
+        if 0 <= pos < len(shortcut_names):
+            return self._components[pos]
+    msg = '{.__name__!r} object has no attributes {!r}'
+    raise AttributeError(msg.format(cls,name))
+\end{python}
+
+\texttt{\_\_getattr\_\_} 方法的实现并不难，但仅这样实现还不够：
+
+\begin{python}
+>>> v = Vector(range(5))
+>>> v
+Vector([0.0, 1.0, 2.0, 3.0, 4.0])
+>>> v.x
+0.0
+>>> v.x = 10
+>>> v.x
+10
+>>> v
+Vector([0.0, 1.0, 2.0, 3.0, 4.0])   # 多西得？
+\end{python}
+
+上面例子之所以矛盾，是 \texttt{\_\_getattr\_\_} 的运作方式导致的：仅当对象没有指定名称的属性时，Python 才会调用那个方法，这是一种后备机制。像 \texttt{v.x = 10} 这样赋值之后，\texttt{v} 对象有了 \texttt{x} 属性。因此使用 \texttt{v.x} 获取 \texttt{x} 属性的值时不会调用 \texttt{\_\_getattr\_\_} 方法了。解释器直接返回绑定到 \texttt{v.x} 上的值，即10、另一方面， \texttt{\_\_getattr\_\_} 方法的实现没有考虑到 \texttt{self.\_components} 之外的示例属性，而是从这个属性中获取 \texttt{shortcut\_names} 中所列的 ``虚拟属性''。
+
+为了避免这种前后矛盾的现象，我们要改写 \texttt{Vector} 类中设置属性的逻辑。
+
+回想上一章最后一个 \texttt{Vector2d} 示例中，如果为 \texttt{.x} 或 \texttt{.y} 实例属性赋值，会抛出 \texttt{AttributeError}。为了避免歧义，在 \texttt{Vector} 类中，如果为名称是单个小写字母的属性赋值，我们也想抛出那个异常。为此，我们要实现 \texttt{\_\_setattr\_\_} 方法。
+
+\begin{python}
+def __setattr__(self, name, value):
+    cls = type(self)
+    if len(name) == 1:  # 当处理的是单个字符的属性
+        if name in cls.shortcut_names:
+            error = 'readonly attribute {attr_name!r}'
+        elif name.islower():    # 当是其他小写字母时
+            error = "can't set attributes 'a' to 'z' in {cls_name!r}"
+        else:           # 否则设置错误为空串
+            error = ''
+        if error:       # 如果有错误，抛出 AttributeError
+            msg = error.format(cls_name = cls.__name__, attr_name = name)
+            raise AttributeError(msg)
+    super().__setattr__(name,value) # 默认情况，在超类上调用 __setattr__ 方法
+\end{python}
+
+虽然这个示例不支持为 \texttt{Vector} 分量赋值，但是有一个问题要特别注意：多数时候，如果实现了 \texttt{\_\_getattr\_\_} 方法，那么也要定义 \texttt{\_\_setattr\_\_} 方法，以防对象的行为不一致。
+
+如果像允许修改分量，可以使用 \texttt{\_\_setitem\_\_} 方法，支持 \texttt{v[0] = 1.1} 这样的赋值，以及实现 \texttt{\_\_setattr\_\_} 方法，支持 \texttt{v.x = 1.1} 这样的赋值，不过，我们要保持 \texttt{Vector} 是不可变的，因为在下一节，我们将把它变成可散列的。
+
+\subsection{\texttt{Vector} 类第4版：散列可快速等值测试}
+
+我们要再次实现 \texttt{\_\_hash\_\_} 方法。加上现有的 \texttt{\_\_eq\_\_} 方法，这会把 \texttt{Vector} 示例变成可散列的对象。
+
+我们要使用异或运算符依次计算各个分量的散列值。这正是 \texttt{functools.reduce} 函数的作用\footnote{reduce 函数的作用参考 CSDN:\url{https://blog.csdn.net/u012193416/article/details/89397388}}。下面示例展示了计算聚合异或的三种方法：
+
+\begin{python}
+>>> n = 0
+>>> for i in range(1,6):     # for 循环计算
+...     n ^= i
+...     
+>>> n
+1
+>>> import functools        # 使用 reduce 集合 lambda 匿名函数
+>>> functools.reduce(lambda a,b: a^b, range(6))
+1
+>>> import operator         # 替换 lambda 函数
+>>> functools.reduce(operator.xor, range(6))
+1
+\end{python}
+
+这里原作者使用了第三种方法编写 \texttt{Vector.\_\_hash\_\_} 方法。
+
+\begin{python}
+import functools
+import operator
+
+......
+    def __hash__(self):
+        hashes = (hash(x) for x in self._components)
+        return functools.reduce(operator.xor, hashes, 0)
+\end{python}
+
+使用 \texttt{reduce(function, iterable, initializer)} 函数时最好提供第三个参数。这样能避免这个异常：TypeError: reduce() of empty sequence with no initial value。如果序列为孔， \texttt{initializer} 是返回的结果；否则，在归约中使用它作为第一个参数，因此应该使用对应函数的恒等值。
+
+上述实现的 \_\_hash\_\_ 方法是一种映射归约计算：把函数应用到各个元素上，生成一个新序列，然后计算聚合值。
+
+映射过程计算各个分量的散列值，规约过程则使用 \texttt{xor} 运算符聚合所有散列值。把生成器表达式替换成 \texttt{map} 方法，映射过程更明显。
+
+\begin{python}
+def __hash__(self):
+    hashed = map(hash, self._components)
+    return functools.reduce(operator.xor, hashed, 0)
+\end{python}
+
+既然讲到了归约，那就把前面曹操实现的 \texttt{\_\_eq\_\_} 方法修改一下，减少处理时间和内存用量(对大型向量来说)。之前的 \texttt{\_\_eq\_\_} 方法非常简洁：
+
+\begin{python}
+def __eq__(self, other):
+    return tuple(self) == tuple(other)
+\end{python}
+
+\texttt{Vector2d} 和 \texttt{Vector} 都可以这样做，让甚至会认为 \texttt{Vector([1,2])} 与 \texttt{(1,2)} 相等。这是个问题，但我们暂且忽略。\footnote{后面章节会解决。}这样做对有几千个分量的 \texttt{Vector} 实例来说，效率十分低下。上述实现方法要完整赋值两个操作数，构建两个元组，而这么做只是为了使用 \texttt{tuple} 的 \texttt{\_\_eq\_\_} 方法。对 \texttt{Vector2d} 来说，这是个捷径。但对 \texttt{Vector} 这降低了效率。下面提供一个更好的方法：
+
+\begin{python}
+def __eq__(self, other):
+    if len(self) != len(other):
+        return False
+    for a,b in zip(self,other):
+        if a!=b:
+            return False
+    return True
+\end{python}
+
+上述效率很好，不过用于计算聚合值的整个 \texttt{for} 循环可以替换成一行 \texttt{all} 函数调用：如果所有分量对的比较结果都是 \texttt{True}，那么结果就是 \texttt{True}。只要有一次比较结果是 \texttt{False}，\texttt{all} 函数返回 \texttt{False}。
+
+\begin{python}
+def __eq__(self, other):
+    return len(self) == len(other) and all(a == b for a,b in zip(self, other))
+\end{python}
+
+\subsection{\texttt{Vector} 类第5版：格式化}
+
+\texttt{Vector} 类的 \texttt{\_\_format\_\_} 方法与 \texttt{Vector2d} 类的相似，但是不适用极坐标，而使用球面坐标。我们把自定义的格式后缀由 '\texttt{p}' 改为 '\texttt{h}'。
+
+\begin{python}
+def angle(self, n):
+    r = math.sqrt(sum(x*x for x in self[n:]))
+    a = math.atan2(r, self[n-1])
+    if (n == len(self)-1) and (self[-1]<0):
+        return math.pi * 2 -a
+    else
+        return a
+
+def angles(self):
+    return (self.angle(n) for n in range(1,len(self)))
+
+def __format__(self, fmt_spec='')
+    if fmt_spec.endswith('h'):
+        fmt_spec = fmt_spec[:-1]
+        coords = itertools.chain([abs(self)], self.angles())
+        outer_fmt = '<{}>'
+    else:
+        coords = self
+        outer_fmt = '(<>)'
+    components = (format(c, fmt_spec) for c in coords)
+    return outer_fmt.format(', '.join(components))
+\end{python}
+
+\newpage

@@ -1,0 +1,419 @@
+\section{字典和集合}
+
+dict 类型是 Python 语言的基石，即使我们没有直接使用到字典。和它相关的内置函数在 \_\_builtins\_\_，\_\_dict\_\_ 模块中。Python 对实现字典进行了高度优化，散列表\footnote{别名：哈希表}是字典类型性能出众的根本原因。集合(set)的实现也依赖于散列表。
+
+\subsection{泛映射类型}
+
+\texttt{collections.abc} 模块中有 \texttt{Mapping} 和 \texttt{MutableMapping} 两个抽象基类\footnote{在 Python 2.6-3.2 中，这两个类属于 \texttt{collections} 模块}，它们的作用是和其他类似的类型定义形式接口。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (container) at (0,4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Container} \\
+                \midrule
+                \textrm{\_\_contains\_\_ } 
+            \end{tabular}
+        };
+
+        \node (iterable) at (0,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Iterable} \\
+                \midrule
+                \_\_iter\_\_
+            \end{tabular}
+        };
+
+        \node (sized) at (0,0) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Sized} \\
+                \midrule
+                \_\_len\_\_
+            \end{tabular}
+        };
+
+        \node (mapping) at (6,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Mapping} \\
+                \midrule
+                \_\_getitem\_\_ \\
+                \_\_contains\_\_ \\
+                \_\_eq\_\_ \\ 
+                \_\_ne\_\_ \\ 
+                get \\
+                items \\
+                keys \\
+                values
+            \end{tabular}
+        };
+
+        \node (mutableMapping) at (12,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{MutableMapping} \\
+                \midrule
+                \_\_setitem\_\_ \\
+                \_\_delitem\_\_ \\
+                clear \\
+                pop \\
+                popitem \\
+                setdefault \\
+                update 
+            \end{tabular}
+        };
+
+        \begin{scope}
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (mapping) -- (container);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (mapping) -- (iterable);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (mapping) -- (sized);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (mutableMapping) -- (mapping);
+        \end{scope}
+    \end{tikzpicture}
+    \caption{MutableMapping 继承关系}
+    \label{MutableMapping 继承关系}
+\end{figure}
+
+非抽象映射类型一般不会直接继承这些继承这些抽象基类，而是会继承 \texttt{dict} 或是 \texttt{collections.UserDict} 进行扩展。可以使用 isinstance 一起被用来判定某个数据是不是广义上的映射类型。
+
+\begin{python}
+my_dict = {}
+isinstance(my_dict,abc.Mapping) # True
+\end{python}
+
+Python 标准库里的所有映射类型都是利用 dict 来实现的，因此它们有个共同的限制，即只有可散列的数据类型才能用作这些映射里的键(只有键有限制，值没有)。
+
+可散列对象需要满足以下三个条件：
+\begin{enumerate}
+    \item 在生命周期中，散列值不变。
+    \item 需要实现 \_\_hash()\_\_方法。
+    \item 需要实现 \_\_eq()\_\_()方法，通过 \_\_id()\_\_ 查散列值用于和其他键作比较。
+\end{enumerate}
+
+在 Python 中，有三类数据类型是可散列的：
+\begin{enumerate}
+    \item 原子不可变数据类型(str,bytes和数值类型)。
+    \item \texttt{frozenset}是可散列的，因为它只能容纳可散列对象。
+    \item 元组，当元组内部包含的所有元素都是可散列元素。
+\end{enumerate}
+
+字典的构造方法有许多，例如如下例子：
+\begin{python}
+a = dict(one=1,two=2,three=3)
+b = {'one':1,'two':2,'three':3}
+c = dict(zip(['one','two','three'],[1,2,3]))
+d = dict([('two':2),('one':1),*('three':3)])
+e = dict({'three':3,'one':1,'two':2})
+a == b == c == d == e       # True
+\end{python}
+
+\subsection{字典推导}
+
+字典推导的概念从 Python 2.7 起移植自列表推导。字典推导可以从任何以键值对作为元素的可迭代对象中构建出字典。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/3-1.py}
+
+字典推导的用法和列表推导几乎一致，这里不再赘述。
+
+\subsection{常见的映射方法}
+
+\noindent \textbf{用 setdefault 处理找不到的键}
+
+当字典 \texttt{d[k]} 不能找到正确的键的时候，可以通过 \texttt{d.get(k,default)} 来给找不到的键一个默认的返回值。但是要更新某个键对应的值的时候，不管使用 \texttt{\_\_getitem\_\_} 还是 \texttt{get} 都不自然，且效率低。这时可以用 \texttt{dict.setfault} 代替。 
+
+\begin{python}
+    # 写法一：setdefault
+    my_dict.setdefault(key,[]).append(new_value)
+    # 写法二：常规写法
+    if key not in my_dict:
+    my_dict[key] = []
+    my_dict[key].append(new_value)
+\end{python}
+
+以上两种写法效果相同，第一种只需一次查询可以完成整个操作，二第二种需要至少两次查询，如果键不存在，则需要三次。
+
+\subsection{映射的弹性键查询}
+
+有时候为了方便起见，就算某个键在映射里不存在，我们也希望通过这个键能读取到一个默认值。有两种方法达到这个目的，一是使用 \texttt{defaultdict} 这个类型。二是自定义一个 \texttt{dict} 的子类，实现 \texttt{\_\_missing\_\_} 方法。
+
+\subsubsection{\texttt{defaultdict}：处理找不到的键的一个选择}
+
+在实例化一个 \texttt{collections.defaultdict} 的时候，需要为构造方法提供一个可调用对象，这个可调用对象会在 \texttt{\_\_getitem\_\_} 碰不到键的时候被调用，返回默认值。
+
+例如我们新建这样一个字典：\texttt{dd = defaultdict(list)}，如果 `\texttt{new-key}' 在 \texttt{dd} 中还不存在，表达式 \texttt{dd[`new-key']} 会按以下步骤来行事：
+
+\begin{enumerate}
+    \item 调用 \texttt{list()} 来建立一个新列表。
+    \item 把这个新列表作为值，\texttt{`new-key'} 作为键，放到 dd 中。
+    \item 返回这个列表的引用。 
+\end{enumerate}
+
+这个用来生成默认值的可调用对象存放在名为 \texttt{default\_factory} 的实例属性里。如果在创建 \texttt{defaultdict} 时没有指定 \texttt{default\_factory}，查询不存在的键会触发 \texttt{KeyError}。用法见下例\footnote{例3-5为本人自己编写，参考文章：\href{https://blog.csdn.net/u014248127/article/details/79338543}{CSDN:yealxxy}}。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/3-5.py}
+
+\texttt{default\_factory} 只会在 \texttt{\_\_getitem\_\_} 里被调用，在其他方法中不会发挥作用。
+
+\subsubsection{特殊方法 \_\_missing\_\_}
+
+所有映射类型在处理找不到的键的时候，都会牵扯到 \texttt{\_\_missing\_\_} 方法。如果一个类继承了 \texttt{dict}，然后提供了 \texttt{\_\_missing\_\_} 方法，在 \texttt{\_\_geiitem\_\_} 碰到找不到键的时候，Python 会自动调用它，而不是抛出 \texttt{KeyError} 异常。
+
+\texttt{\_\_missing\_\_} 方法只会被 \texttt{\_\_getitem\_\_} 调用，这也是上一节 \texttt{default\_factory} 只会被 \texttt{\_\_getitem\_\_} 调用的原因。
+
+有时候，在查询的时候，我们希望将键通通转换为 str。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/3-7.py}
+
+在上述代码中，如果没有第 5 行判断，调用 \texttt{\_\_gititem\_\_} 则会陷入无限循环。在第17行中使用了 \texttt{self.keys()}\footnote{这种操作在 Python3 中很快，不同担心速度问题} 而不是 \texttt{for key in dict}，因为这样会导致递归调用，可能陷入无限循环。
+
+\subsection{字典的变种}
+
+这一节主要讲 \texttt{collections} 模板中，除了 \texttt{defaultdict} 之外的映射类型。
+
+\begin{itemize}
+    \item \texttt{collections.OrderedDict} \\
+    添加键的时候保持顺序。\texttt{popitem} 方法默认删除并返回字典的最后一个元素。
+    \item \texttt{collections.ChainMap}  \\
+    该类型可以容纳数个不同的映射对象，在进行键查找操作的时候，对象会被当作一个整体逐个查找。
+    \item \texttt{collections.Counter}  \\
+    该映射类型会给键准备一个整数计数器。每次更新一个键的时候都会增加这个计数器。
+    \begin{python}
+        ct = collections.Counter('abcdeabcdabc') # Counter({'a':3,'b':3,'c':3,'d':2,'e':1})
+    \end{python}
+    \item \texttt{collections.UserDict} \\
+    把标准 \texttt{dict} 用纯 Python 又写了一遍。
+\end{itemize}
+
+\subsection{子类化 UserDict}
+
+在创造自定义映射类型来说，用 \texttt{UserDict} 比普通的 \texttt{dict} 作为基类更方便。主要原因是，后者在某些方法的实现上会走一些捷径，导致我们不得不在它的子类中重写这些方法\footnote{关于内置类继承有什么不好，在后面章节会说明}，但是 \texttt{UserDict} 并没有这些问题。
+
+\texttt{UserDict} 并不是 \texttt{dict} 的子类，但是 \texttt{UserDict} 有一个 \texttt{data} 属性，是 \texttt{dict} 实例，这个属性实际上是 \texttt{UserDict} 最终存储数据的地方。这样做的好处是，比起 例3-7，\texttt{UserDict} 的子类能在实现 \texttt{\_\_setitem\_\_} 的时候避免不必要的递归，也可以让 \texttt{\_\_contains\_\_} 里的代码更简洁。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/3-8.py}
+
+\texttt{UserDict} 继承自 \texttt{MutableMapping}，里面有两个常用的方法值得关注：
+
+\begin{itemize}
+    \item \texttt{MutableMapping.update} \\
+    该方法不但可以为我们所直接使用，还用在 \texttt{\_\_init\_\_} 中，让构造方法可以利用传入各种参数来新建实例。这个方法的背后是 \texttt{self[key] = value} 来添加新值，所以它其实是在使用 \texttt{\_\_setitem\_\_} 方法。
+    \item \texttt{Mapping.get}\footnote{Mapping 是 MutableMapping 的父类} \\
+    在示例 3-7 中，我们改写了 \texttt{get} 方法，然而在 例3-8 中却没有必要，因为 \texttt{Mapping.get} 方法的实现和 例3-7 中的实现一致。
+\end{itemize}
+
+\subsection{不可变映射类型}
+
+标准库中的所有映射类型都是可变的，从 Python 3.3 开始，\texttt{types} 模块引入了一个封装类 \texttt{MappingProxyType}。如果给这个类一个映射，它会返回一个只读的映射视图。虽然是只读的，但它是动态的。这意味着如果对原映射做了改动，通过这个视图可以观察到，但是无法通过这个视图对原映射做出修改。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/3-9.py}
+
+\subsection{集合论}
+
+Python 中的 ``集''\footnote{原书中 ``集'' 指 set 和 frozenset，``集合''指 set}指 \texttt{set} 和它的不可变姐妹类型 \texttt{frozenset},它们在 Python 2.6 才被列入内置类型，属于非常年轻的概念。
+
+集合的本质是许多唯一对象的聚集。集合中的元素必须是可散列的，\texttt{set} 类型本身是不可散列的，但是 \texttt{forzenset} 可以。
+
+集合实现了很多基础的中缀运算，利用这运算可以简化代码，同时还能减少程序运行时间，给定两个集合 \texttt{a} 和 \texttt{b}。
+\begin{itemize}
+    \item \texttt{a|b}: 合集
+    \item \texttt{a\&b}: 交集
+    \item \texttt{a-b}: 差集
+\end{itemize}
+
+下面看一个例子，假定有两个地址集合，一个较小的 \texttt{needles}，一个较大的 \texttt{haystack} ：
+\begin{python}
+# 写法一
+found = len(needles & haystack)
+# 写法二
+found = 0
+for n in needles:
+    if n in haystack:
+        found += 1
+# 写法三
+found = len(set(needles).intersection(haystack))
+\end{python}
+
+其中写法一比二速度要快一些，但写法二可以用在任何可迭代对象上。写法三适用于所有可迭代对象，但会牵扯到把对象转换为集合的成本，不过 \texttt{needles} 或是 \texttt{haystack} 若任何一个已经是集合，效率仍然会更高。
+
+\subsubsection{集合字面量}
+
+除了空集之外，集合的字面量 —— \{1\},\{1,2\} 等，看起来和它的数学形式一模一样。如果是空集，必须写成 \texttt{set()} 形式。在创建空集过程中，也必须适用 \texttt{set()}，使用 \{\} 则会创建空字典。空集的返回形式也是 \texttt{set()}。
+
+利用 \texttt{{1,2,3}} 这样的字面量句法比构造方法 \texttt{set([1,2,3])} 更快且更易读。后者在构建过程中，必须先从 \texttt{set} 这个名字来查询构造方法，然后新建一个列表，最后再把列表传入构造方法。如果是字面量，则会利用一个专门叫做 \texttt{BUILD\_SET} 的字节码创建集合。可惜的是 frozenset 并没有字面量句法。
+
+\subsubsection{集合推导}
+
+集合推导和字典推导一样，源于列表推导，这里不再过多介绍
+
+\subsubsection{集合的操作}
+
+按照惯例，查看一下集合的继承关系
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (container) at (0,4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Container} \\
+                \midrule
+                \textrm{\_\_contains\_\_ } 
+            \end{tabular}
+        };
+
+        \node (iterable) at (0,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Iterable} \\
+                \midrule
+                \_\_iter\_\_
+            \end{tabular}
+        };
+
+        \node (sized) at (0,0) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Sized} \\
+                \midrule
+                \_\_len\_\_
+            \end{tabular}
+        };
+
+        \node (set) at (6,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Set} \\
+                \midrule
+                isdisjoint \\
+                \_\_le\_\_ \\
+                \_\_lt\_\_ \\
+                \_\_gt\_\_ \\ 
+                \_\_ge\_\_ \\ 
+                \_\_eq\_\_ \\ 
+                \_\_ne\_\_ \\ 
+                \_\_and\_\_ \\ 
+                \_\_or\_\_ \\ 
+                \_\_sub\_\_ \\ 
+                \_\_xor\_\_ 
+            \end{tabular}
+        };
+
+        \node (mutableSet) at (12,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{MutableSet} \\
+                \midrule
+                \_\_ior\_\_ \\
+                \_\_iand\_\_ \\
+                \_\_ixor\_\_ \\
+                \_\_isub\_\_ \\
+                add \\
+                discard \\
+                remove \\
+                pop \\
+                clear 
+            \end{tabular}
+        };
+
+        \begin{scope}
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (set) -- (container);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (set) -- (iterable);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (set) -- (sized);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (mutableSet) -- (set);
+        \end{scope}
+    \end{tikzpicture}
+    \caption{MutableSet 继承关系}
+    \label{MutableSet 继承关系}
+\end{figure}
+
+集合有关的数学操作这里不再一一列举。
+
+\subsection{dict 和 set 的背后}
+\subsubsection{一个关于效率的实验}
+
+从经验中可以得出结论，字典和集合的速度非常快。在作者的实验\footnote{原书 P74-75}中，作者从 1000 个元素的字典里搜索 1000 个浮点数用了0.202 毫秒，在 10000000 个元素的字典里搜索 1000 个浮点数用了 0.337 毫秒。集合的速度也相差无几。
+
+然而用到列表运算时，最后却用到了 97 秒，无疑列表的速度最为糟糕。这是因为列表背后没有散列表来支持 in 运算符。每次搜索都需要扫描一次完整的列表，这使得时间线性增加了。
+
+\subsubsection{字典中的散列表}
+
+这节简单介绍了散列表的原理。
+
+散列表其实是一个稀疏矩阵，在 \texttt{dict} 的散列表中，每个键值对都占用一个表元，每个表元都有两个部分，一个是对键的引用，另一个是对值的引用。因为所有表元大小一致，所以可以通过偏移量来读取某个表元。
+
+Python 会设法保证大概还有三分之一的表元是空的，所以在快要达到这个阈值时，原有的散列表会被复制到一个更大的空间里面。
+
+\noindent\textbf{散列值和相等性}
+
+如果两个对象在比较的时候是相等的，那它们的散列值必须相等，否则散列表就不能正常运行了\footnote{散列值相同，内部结构不一定相同}。
+
+为了让散列值能够胜任散列表索引这一角色，它们必须在索引空间中尽量分散开来。这意味着在理想状态下，越是相似但不相等的对象，散列值差别越大。
+
+\noindent\textbf{散列表算法}
+
+为了获取 \texttt{my\_dict[search\_key]} 背后的值，Python 首先会调用 \texttt{hash(search\_key)} 计算 \texttt{search\_key} 的散列值，把这个值最低的几位数字仿作偏移量，在散列表里查找表元。若找到的表元为空，则抛出 \texttt{KeyError} 异常。若不为空，则表元里一定会有一对 \texttt{found\_key:found\_value}。这时候会检验 \texttt{search\_key == found\_key}，若相等，则返回 \texttt{found\_value}。
+
+如果 \texttt{search\_key} 与 \texttt{found\_key} 不匹配，称为散列冲突。其原因是：散列表所做的其实是把随机的元素映射到只有几位的数字上，而散列表本身的索引又只依赖于这个数字的一部分。为了解决这个冲突，算法会在散列值中另外再取几位，然后用特殊的方法处理一下，把新得到的数字再当作索引来寻找表元。若这次得到的表元是空的，同样抛出 \texttt{KeyError}；若非空，或者键匹配，则返回这个值；若又发现了散列表冲突，则重复。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[thick,font=\small,inner xsep=1em,inner ysep=1ex,-Stealth,align=center]
+        \node[draw,minimum width=9em] (1) at (0,2.5) {计算键的散列值};
+        \node[draw,text width=7em] (2) at (0,0) {定位散列表中的一个表元};
+        \node[draw,shape aspect=2,diamond,inner xsep=0] (3) at (5,0) {表元为空？};
+        \node[draw,shape aspect=2,diamond,inner xsep=0] (4) at (10,0) {键相等？};
+        \node[draw,text width=7em] (5) at (10,2.5) {使用散列值得另一部分定位散列表中的另一行};
+        \node[draw,rounded corners] (6) at (5,-2.5) {抛出KeyError};
+        \node[draw,rounded corners] (7) at (10,-2.5) {返回表元里的值};
+        \draw (1) -- (2);
+        \draw (2) -- (3);
+        \draw (3) -- (4) node[below,pos=0.5] {否};
+        \draw (4) -- (5) node[right,pos=0.5] {否 \quad 散列冲突};
+        \draw (5) -| (3);
+        \draw (3) -- (6) node[right,pos=0.5] {是};
+        \draw (4) -- (7) node[right,pos=0.5] {是};
+    \end{tikzpicture}
+    \caption{散列表原理}
+    \label{fig:散列表原理}
+\end{figure}
+
+在插入新值时，Python 可能会按照散列表拥挤程度来决定是否要重新分配内存来扩容。这样做的目的是减少发生散列冲突的概率。正常情况下，即使是百万个元素，散列冲突的次数也不会超过5次。
+
+\subsubsection{\texttt{dict} 的实现及其导致的结果}
+
+\noindent\textbf{键必须是可散列的}
+
+一个可散列的对象必须满足以下要求：
+\begin{enumerate}
+    \item 支持 hash() 函数，并通过 \texttt{\_\_hash\_\_} 方法所得到的散列值是不变的。
+    \item 支持通过 \texttt{\_\_eq\_\_} 方法来检验相等性。
+    \item 若 \texttt{a == b} 为真，则 \texttt{hash(a) == hash(b)} 也为真。
+\end{enumerate}
+
+所有由用户自定义的对象默认都是可散列的，因为它们的散列值由 \texttt{id()} 获取，而且它们都是不相等的。
+
+如果用户自定义了一个类的 \texttt{\_\_eq\_\_} 方法，并且希望它是可散列的，那么它一定要有个恰当的 \texttt{\_\_hash\_\_} 方法，保证 \texttt{a == b} 为真，则 \texttt{hash(a) == hash(b)} 也为真。否则就会破坏恒定的散列表算法，导致由这些对象所组成的字典和集合完全失去可靠性，这个后果非常可怕。另一方面，如果一个含有自定义的 \texttt{\_\_eq\_\_} 依赖的类处于可变的状态，那就不要在这个类中实现 \texttt{\_\_hash\_\_} 方法，因为它的实例时不可散列的。
+
+\noindent\textbf{字典在内存上开销巨大}
+
+由于字典使用了散列表，散列表又必须是稀疏的，这导致空间效率低下。因此大规模数据还是放在元组中较好，一方面这会节省空间，另一方面元组无需把记录中字段的名字在每个元素里都遍历一遍。
+
+在用户自定义类型中，\texttt{\_\_slots\_\_} 属性可以改变实例属性的存储方式，由 \texttt{dict} 编程 \texttt{tuple}，后面章节会细讲。
+
+空间优化在开发过程中资源足够的情况下并不那么重要，因为优化的对立面就是可维护性。
+
+\noindent\textbf{键的次序取决于添加顺序}
+
+在 \texttt{dict} 里添加新键而又发生散列冲突的时候，新键可能会被安排存放在另一个位置。于是会发生这样一种情况，\texttt{dict([(key1,value1),(key2,value2)])} 和 \texttt{dict([(key2,value2)}
+,\texttt{(key1,value1)])} 得到的是两个字典。在进行比较的时候，它们是相等的；但如果 \texttt{key1} 和 \texttt{key2} 在添加到字典里的过程中又冲突发生的话，这两个键出现在字典里的顺序是不一样的。
+
+\noindent\textbf{往字典里添加新键可能会改变已有键的顺序}
+
+往字典里添加新的键，Python 解释器有可能会做出为字典扩容的决定，这个过程可能会发生散列冲突，并导致新散列表中键的次序发生变化。由此可知，不要对字典同时进行迭代和修改。如果必须这样做，最好分成两步：首先对字典迭代，得出想要修改的内容，并放在一个新的字典里；迭代结束后再对原有的字典进行更新。
+
+\subsubsection{\texttt{set} 的实现以及导致的结果}
+字典和散列表的几个特点对集合几乎都适用，为了避免集合有太多重复的内容，应遵循以下规则：
+\begin{itemize}
+    \item 集合元素都是可散列的
+    \item 集合很消耗内存
+    \item 可以搞笑判断集合中是否存在某个元素
+    \item 元素的次序取决于被添加到结合的次序
+    \item 往集合里添加元素，可能会改变集合中元素的次序
+\end{itemize}
+
+
+\newpage

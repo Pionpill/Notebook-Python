@@ -1,0 +1,563 @@
+\chapter{控制流程}
+\section{可迭代对象，迭代器和生成器}
+
+Python 中，所有的生成器都是迭代器，因为生成器完全实现了迭代器接口。并且，大多数情况下，迭代器和生成器都被视作同一概念。
+
+在 Python3 中，生成器具有广泛的作用。即使是内置的 \texttt{range()} 函数也返回一个类似生成器的对象，而以前则返回完整的列表。如果一定要返回列表，那么必须明确指出(如：\texttt{list(range(10))})。
+
+在 Python 中，所有集合都是可迭代的。在 Python 语言内部，迭代器用于支持：
+\begin{itemize}
+    \item \texttt{for} 循环。
+    \item 构建和扩展集合类型
+    \item 逐行遍历文本文件
+    \item 列表推导，字典推导和集合推导
+    \item 元组拆包
+    \item 调用函数时，使用 * 拆包实参
+\end{itemize}
+
+\subsection{\texttt{Sentence} 类第1版：单词序列}
+
+我们要实现一个 \texttt{Sentence} 类，以此打开探索可迭代对象的旅程。我们向这个类的构造函数传入包含一些文本的字符串，然后可以逐个单词迭代。第1版要实现序列协议：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-1.py}
+
+\noindent\textbf{序列可迭代的原因： \texttt{iter} 函数}
+
+解释器需要迭代对象 \texttt{x} 时，会自动调用 \texttt{iter(x)}。内置的 \texttt{iter} 函数有以下作用：
+
+\begin{enumerate}
+    \item 检查对象是否实现了 \texttt{\_\_iter\_\_} 内置函数，如果实现了则调用，获取一个迭代器。
+    \item 如果没有 \texttt{\_\_iter\_\_} 方法，但是有 \texttt{\_\_getitem\_\_} 方法，则创建一个迭代器，尝试按顺序(索引0开始)获取元素。
+    \item 如果尝试失败，则抛出错误：\texttt{TypeError}：``xx object is not iterable''。
+\end{enumerate}
+
+任何序列类型都可迭代，是因为它们都实现了 \texttt{\_\_getitem\_\_} 内置方法。其实，标准的序列都实现了 \texttt{\_\_iter\_\_} 内置方法，因此我们也应该这么做。之所以对 \texttt{\_\_getitem\_\_} 方法作特殊处理，是为了向后兼容，未来可能不会再这么做。
+ 
+在鸭子类型中，只要实现特殊的 \texttt{\_\_iter\_\_} 方法，或者实现 \texttt{\_\_getitem\_\_} 方法且 \texttt{\_\_getitem\_\_} 方法的参数是从 0 开始的整数，就可以认为对象是可迭代的。
+
+在白鹅类型理论中，可迭代对象的定义简单一些，不过没那么灵活：如果实现了 \texttt{\_\_iter\_\_} 方法，那么就认为对象是可迭代的。此时，不需要创建子类，也不用注册，因为 abc.Iterable 类实现了 \texttt{\_\_subclasshook\_\_} 方法，下面举个例子：
+
+\begin{python}
+>>> class Foo:
+...     def __iter__(self):
+...         pass
+>>> from collections import abc
+>>> issubclass(Foo, abc.Iterable)
+True 
+>>> f = Foo()
+>>> isinstance(f, abc.Iterable)
+True
+\end{python}
+
+不过要注意，虽然前面定义的 \texttt{Sentence} 类是可迭代的，但却无法通过 \texttt{issubclass(Sentence, abc.Iterable)} 测试。
+
+从 Python3.4 开始，检查对象 \texttt{x} 是否迭代，最准确的方法是调用 \texttt{iter(x)} 函数，如果不可迭代，再处理 \texttt{TypeError} 异常。遮蔽 \texttt{isinstance(x,abc.Iterable)} 更为准确，因为 \texttt{iter(x)} 会考虑到遗留的 \texttt{\_\_getitem\_\_} 方法。
+
+\subsection{可迭代对象与迭代器的对比}
+
+两者之间的关系：Python 从可迭代对象中获取迭代器。
+
+下面我们看一个简单的例子：字符串是可迭代对象，背后是有迭代器的，只是我们看不到：
+\begin{python}
+>>> s = 'ABC'
+>>> for char in s:
+...     print(char)
+\end{python}
+
+如果没有 \texttt{for} 语句，不自动构建迭代器，我们用 \texttt{while} 语句得这样写：
+
+\begin{python}
+>>> s = 'ABC'
+>>> it = iter(s)    # 使用可迭代对象构建迭代器
+>>> while(True):
+...     try:
+...         print(next(it))     # 不断获取下一个字符
+...     except StopIteration:   # 没有字符了，报错
+...         del it              # 释放迭代器对象
+...         break               # 退出循环
+\end{python}
+
+\texttt{StopIteration} 异常表明迭代器到头了。Python 语言内部会处理 \texttt{for} 循环和其他迭代上下文中的 \texttt{StopIteration} 异常。
+
+标准得迭代器接口有两个方法。
+\begin{itemize}
+    \item \texttt{\_\_next\_\_}
+    
+    返回下一个可用的元素，如果没有，抛出 \texttt{StopIteration} 异常。
+
+    \item \texttt{\_\_iter\_\_}
+    
+     返回 \texttt{self} ，以便在应该使用可迭代对象的地方使用迭代器，例如 \texttt{for} 循环中。
+\end{itemize}
+
+这个接口在 collections.abc.Iterable 抽象基类中制定。
+
+因为迭代器只需要 \_\_next\_\_ 和 \_\_iter\_\_ 两个方法，所以除了调用 \texttt{next()} 方法，以及捕获 \texttt{StopIteration} 异常之外，没有办法检查是否还有遗留的元素。此外，也没有办法 ``还原'' 迭代器。如果想再次迭代，就要调用 \texttt{iter(...)} ，传入之前构建迭代器得可迭代对象。传入迭代器本身没有用，因为 \texttt{Iterator.\_\_iter\_\_} 方法的实现方式是返回实例本身，所以传入迭代器无法还原已经耗尽的迭代器。
+ 
+\begin{python}
+# abc.Iterator 类
+class Iterator(Iterable):   # Iterable 只有 __iter__ 一个内置函数
+    __slots__ = ()
+
+    @abstractmethod
+    def __next__(self):
+        raise StopIteration
+
+    def __iter__(self):
+        return self
+
+    @classmethod
+    def __subclasshook__(cls, C):
+        if cls is Iterator:
+            if (any("__next__" in B.__dict__ for B in C.__mro__) and
+                any("__iter__" in B.__dict__ for B in C.__mro__)):
+                return True
+            return NotImplemented
+\end{python}
+
+现在我们总结一下可迭代对象与迭代器：
+\begin{itemize}
+    \item \textit{可迭代对象}
+    
+    使用 \texttt{iter} 内置函数可以获取迭代器的回想。如果对象实现了能返回迭代器的 \texttt{\_\_iter\_\_} 方法，那么对象是可迭代。序列都可以迭代；实现了 \texttt{\_\_getitem\_\_} 方法，而且其参数是从零开始的索引，这种对象也可以迭代。
+
+    可迭代对象一般通过 \texttt{iter(x)} 进行检验。
+
+    \item \textit{迭代器}
+    
+    实现了无参数的 \texttt{\_\_next\_\_} 方法，返回序列的下一个元素；如果没有元素了，那么抛出 \texttt{StopIteration} 异常。Python 中的迭代器还实现了 \texttt{\_\_iter\_\_} 方法，因此迭代器也可以迭代。
+
+    迭代器对象一般通过 \texttt{isinstance(x, abc.Iterator)} 进行检验。
+\end{itemize}
+
+\subsection{\texttt{Sentence} 类第2版：典型的迭代器}
+
+这一版的对象实现典型的迭代器涉及模型，但并不符合 Python 习惯做法，后面重构会说明原因。这一版能明确可迭代的集合和迭代器对象之间的关系。
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-4.py}
+
+对于上面示例的 \texttt{SentenceIterator} 来说，没有必要实现 \texttt{\_\_iter\_\_} 方法，因为几乎不会使用到该方法，实现的目的是为了满足迭代器协议，而且这么做能让迭代器通过 \texttt{issubclass(SentenceIterator, abc.Iterator)} 测试。如果让 \texttt{SentenceIterator} 类继承 \texttt{abc.Iterator} ，那么它会继承对应的 \texttt{\_\_iter\_\_} 方法。
+
+\noindent\textbf{把 Sentence 编程迭代器：坏主意}
+
+构建可迭代对象与迭代器时经常会出现错误，我们必须注意，迭代器可以迭代，但是可迭代对象不是迭代器。原因是可迭代对象的有个 \texttt{\_\_iter\_\_} 方法，每次都实例化一个新的迭代器；而迭代器要实现 \texttt{\_\_next\_\_} 方法，返回单个元素，此外还要实现 \texttt{\_\_iter\_\_} 方法，返回迭代器本身。
+
+如果我们在 \texttt{Sentence} 类中实现 \texttt{\_\_next\_\_} 方法，让 \texttt{Sentence} 实例既是可迭代对象，也是自身的迭代器。可是这种方法是十分糟糕的，绝对不要这样使用。其主要原因是支持多种便利，即必须从同一个迭代实例中获取多个独立的迭代器，而且各个迭代器要维护自身的内部状态。
+
+\subsection{\texttt{Sentence} 类第3版：生成器函数}
+
+实现相同功能，但却符合Python习惯的方式是，用生成器函数代替 \texttt{SentenceIterator} 类。
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-5.py}
+
+在上述示例中，迭代器其实是生成器对象，每次调用 \texttt{\_\_iter\_\_} 方法都会自动创建，因为这里的 \texttt{\_\_iter\_\_} 方法是生成器函数。
+
+\noindent\textbf{生成器函数的工作原理}
+
+只要 Python 函数的定义体中有 \texttt{yield} 关键字，该函数就是生成器函数。调用生成器函数时，会返回一个生成器 对象。也就是说，生成器函数是生成器工厂。
+
+生成器函数会创建一个生成器对象，包装生成器函数的定义体。把生成器传给 \texttt{next(...)} 函数时，生成器函数会向前，执行函数定义体中的下一个 \texttt{yield} 语句，返回产出的值，并在函数定义体的当前位置暂停。最终，函数的定义体返回时，外层的生成器对象会抛出 \texttt{StopIteration} 异常 —— 这一点与迭代器协议一致。
+
+注意，生成器对象不需要 \texttt{return} 语句，如果有并遇到了 \texttt{return} 则会抛出 \texttt{StopIteration} 错误。
+
+下面函数将更佳清楚地说明生成器函数工作原理。
+
+\begin{python}
+>>> def gen_AB():       # 定义生成器函数与普通函数无异
+...     print('start')
+...     yield 'A'           # 第一次调用 __next__ 时，停在此处
+...     print('continue')
+...     yield 'B'           # 第二次调用停在此处
+...     print('end.')       # 第三次调用，打印 end. 并抛出 StopIteration 异常
+... 
+>>> for c in gen_AB():
+...     print('-->', c)
+... 
+start 
+---> A 
+continue 
+---> B 
+end. 
+>>>         # for 循环捕捉了 StopIteration 异常，因此没有报错
+\end{python}
+ 
+\subsection{\texttt{Sentence} 类第4版：惰性实现}
+
+惰性在编程语言和 API 中被认为是好的特性。惰性实现是指尽可能延后生成值。这样做能节省内存，而且获取还可以避免做无用的处理。
+
+设计 \texttt{Iterator} 接口时考虑到了惰性： \texttt{next(my\_iterator)} 一次生成一个元素。目前实现的几版 \texttt{Sentence} 类都不具有惰性，因为 \texttt{\_\_init\_\_} 方法急迫地构建好了文本中的单词列表，然后将其绑定到 \texttt{self.words} 属性上。这样就得处理整个文本，降低了效率。
+
+\texttt{re.finditer} 函数是 \texttt{re.findall} 函数的惰性版本，返回的不是列表，而是一个生成器，按需生成 \texttt{re.MatchObject} 实例，这将节省大量内存。
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-7.py}
+
+\subsection{\texttt{Sentence} 类第5版：生成器表达式}
+
+简单的生成器函数，可以替换成生成器表达式。
+
+生成器表达式可以理解为列表推导的惰性版本：不会迫切地构建列表，而是返回一个生成器，按需惰性生成元素。也就是说，如果列表推导是制造列表的工程，那么生成器表达式就是制造生成器的工厂。
+
+生成器表达式会产出生成器，由此可以构建更为精简的 \texttt{Sentence} 类：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-9.py}
+
+\subsection{何时使用生成器表达式}
+
+生成器表达式是语法糖：完全可以替换成生成器函数，不过有时生成器表达式更佳便利。
+
+生成器表达式是创建生成器的简洁句法，这样无需先定义函数再调用。不过，生成器灵活得多，可以使用多个语句实现复杂的逻辑，也可以作为协程\footnote{后文会讲。}使用。
+
+选择何种句法很容易判断：如果生成器表达式要分成多行写，倾向于定义生成器函数，以便提高可读性。此外生成器函数可以重用。
+
+如果函数或构造方法只有一个参数，传入生成器表达式时不用写一对调用函数的括号，再写一对生成器表达式的阔含，只写一对就行了：
+
+\begin{python}
+    return Vector(n * scalar for n in self)
+\end{python}
+
+\subsection{等差数列生成器}
+
+下面我们来创建一个等差数列生成类：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-11.py}
+
+在最后一行，我们没有使用 self.step 不断地增加 result 而是应用了 index 获得，这样避免了处理浮点数时累积效应引起的风险。
+
+在这个类中，我们应用生成器表达式的特性，实现了无穷数列的生成。
+
+这个示例简单地说明了如何使用生成器函数实现特殊的 \texttt{\_\_iter\_\_} 方法。不过如果一个类只是为了构建生成器而去实现 \texttt{\_\_iter\_\_} 方法，那还不如使用生成器函数。
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-12.py}
+
+\noindent\textbf{使用 \texttt{itertools} 模块生成等差数列}
+
+Python3.4 中的 \texttt{itertools} 模块提供了 19 个生成器函数，结合起来使用能实现很多有趣的用法。
+
+例如， \texttt{itertools.count} 函数返回的生成器能生成多个数，如果不传入参数，生成从零开始的整数数列。也可以提供可选的 \texttt{start} 和 \texttt{step} 值。
+
+\begin{python}
+    >>> import itertools
+    >>> gen = itertools.count(1, .5)
+    >>> next(gen)
+    1
+    >>> next(gen)
+    1.5
+\end{python}
+
+然而，像 \texttt{itertools.count} 这样的生成无穷个元素的函数从不停止。因此，如果调用 \texttt{list(count())} ，Python 会创建一个特别大的表，导致电脑崩溃。
+
+不过， \texttt{itertools.takewhile} 函数则不同，它会生成一个使用另一个生成器的生成器，在指定的条件计算结果为 \texttt{False} 时停止。因此，可以把这两个函数结合起来使用，编写下述代码：
+
+\begin{python}
+    >>> gen = itertools.takewhile(lambda n: n<3 , itertools.count(1, .5))
+    >>> list(gen)
+    [1, 1.5, 2.0, 2.5]
+\end{python}
+
+下面使用这两个函数，写出有穷的等差数列函数：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/14-13.py}
+
+注意上述函数不是生成器函数，而是生成器工厂函数。
+
+\subsection{标准库中的生成器函数}
+
+标准库中提供了很多生成器，下面将按功能分组，简单介绍其中的 24 个。\footnote{这里每个函数只提供了一个示例，更全面的用法请看原书P350或参考官方文档。}
+
+第一组是用于过滤的生成器函数：从输入的可迭代对象中产出元素的子集，而且不修改元素本身。就像 \texttt{itertools.takewhile} 函数一样，下表中的大多数函数都接受一个断言参数。这个参数是个布尔函数，有一个参数，会应用到输入中的每个元素上，用于判断元素是否包含在输出中。
+
+\begin{table}[H]
+    \centering
+    \caption{用于过滤的生成器函数}
+    \label{table:用于过滤的生成器函数}
+    \setlength{\tabcolsep}{2mm}
+    \small
+    \begin{tabular}{l|l|p{9cm}}
+        \toprule
+        \textbf{模块} & \textbf{函数} & \textbf{说明} \\
+        \midrule
+        \texttt{itertools} & \texttt{compress(it, selector\_it)} & 并行处理两个可迭代的对象，如果 \texttt{selector\_it} 中的元素是真值，产出 it 中对应的元素。 \\
+        \midrule
+        \texttt{itertools} & \texttt{dropwhile(predicate, it)} & 处理 \texttt{it} 跳过 \texttt{predicate} 的计算结果为真值的元素，然后产出剩下的各个元素。(不再进一步检查) \\
+        \midrule
+        (内置) & \texttt{filter(predicate, it)} & 把 \texttt{it} 中的各个元素传给 \texttt{predicate} ，如果 \texttt{predict(item)} 返回真值，那么产出对应的元素；如果 \texttt{predict} 是 \texttt{None}，那么只产生真值元素。\\
+        \midrule
+        \texttt{itertools} & \texttt{filterfalse(predicate, it)} & 与 \texttt{filter} 函数的作用类似，不过 \texttt{predicate} \texttt{的逻辑是相反的：predicate} 返回假值时产出对应的元素 \\
+        \midrule
+        \texttt{itertools} & \texttt{islice(it,start,stop,step)} &  产出 \texttt{it} 的切片，作用类似于 \texttt{s[:stop]} 或 \texttt{s[start:stop:step]}，不过 \texttt{it} 可以是任何可迭代的对象，而且这个函数实现的是惰性操作。 \\
+        \midrule
+        \texttt{itertools} & \texttt{takewhile(predicate, it)} & \texttt{predicate} 返回为真值时产出对应元素，然后立即停止，不再继续检查。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+下面演示各个函数的用法：
+\begin{python}
+>>> import itertools
+>>> def vowel(c):
+...     return c.lower() in 'aeiou'
+... 
+>>> list(filter(vowel, 'Aardvark'))     # 返回真值则产生
+['A','a','a']
+>>> list(itertools.filterfalse(vowel,'Aardvark'))     # 返回假值则产生
+['r','d','v','r','k']
+>>> list(itertools.dropwhile(vowel,'Aardvark'))     # 跳过前面的真值
+['r','d','v','a','r','k']
+>>> list(itertools.takewhile(vowel,'Aardvark'))     # 只产生前面的真值
+['A','a']
+>>> list(itertools.compress('Aardvark',(1,0,1,1,0,1)))  # 产生对应为真的值
+['A','r','d','a']
+>>> list(itertools.islice('Aardvark',1,7,2))    # 类似切片操作
+['a','d','a']
+\end{python}
+
+下一组用于映射的生成器函数：在输入的单个可迭代对象中的各个元素上做计算，然后返回结果。
+
+\begin{table}[H]
+    \centering
+    \caption{用于映射的生成器函数}
+    \label{table:用于映射的生成器函数}
+    \setlength{\tabcolsep}{2mm}
+    \small
+    \begin{tabular}{l|l|p{9cm}}
+        \toprule
+        \textbf{模块} & \textbf{函数} & \textbf{说明} \\
+        \midrule
+        \texttt{itertools} & \texttt{accumulate(it,[func])} & 产出累计的总和：如果提供了 \texttt{func},那么把前两个元素传给它，然后把结果和下一个元素运算，以此类推。 \\
+        \midrule
+        (内置) & \texttt{enumerate(iterable, start=0)} & 产出由两个元素组成的元组，结构是 \texttt{(index,item)} ,其中 \texttt{index} 从 \texttt{start} 开始计数， \texttt{item} 则从 \texttt{iterable} 中取。 \\
+        \midrule
+        (内置) & \texttt{map(func,it1,[it2...])} & 把 \texttt{it} 中的各个元素传给 \texttt{func} 产出结果；如果传入 N 个可迭代对象，那么 \texttt{func} 必须能接受 N 个参数，而且要并行处理各个可迭代对象。 \\
+        \midrule
+        \texttt{itertools} & \texttt{starmap(func,it)} & 把 \texttt{it} 中的各个元素传给 \texttt{func} 产出结果；输入的可迭代对象应该产出可迭代元素 \texttt{iit}，然后以 \texttt{func(*itt)} 这种形式调用 \texttt{func}。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{python}
+>>> import itertools
+>>> import operator
+>>> sample = [5,4,2,8,7,6,3,0,9,1]
+>>> list(itertools.accumulate(sample,max))  # 产生最值
+[5,5,5,8,8,8,8,8,9,9]
+>>> list(enumerate('abc',1))    # 产生编号与元素
+[(1,'a'),(2,'b'),(3,'c')]
+>>> list(map(operator.mul, rang(11), range(11)))    # 映射运算
+[0,1,4,9,16,25,36,49,64,81,100]
+>>> list(itertools.starmap(operator.mul,enumerate('abc',1)))    # 拆包映射运算
+['a','bb','ccc']
+\end{python}
+
+接下来一组用于合并的生成器函数，这些函数都从输入的多个可迭代对象中产出元素。
+\begin{table}[H]
+    \centering
+    \caption{合并多个了迭代对象的生成器函数}
+    \label{table:合并多个了迭代对象的生成器函数}
+    \setlength{\tabcolsep}{2mm}
+    \small
+    \begin{tabular}{l|l|p{9cm}}
+        \toprule
+        \textbf{模块} & \textbf{函数} & \textbf{说明} \\
+        \midrule
+        \texttt{itertools} & \texttt{chain(it1,...)} & 先产出 \texttt{it1} 中的所有元素，然后产出 \texttt{it2} 中的所有元素，以此类推。 \\
+        \midrule
+        \texttt{itertools} & \texttt{chain.from\_iterable(it)} & 产出 \texttt{it} 生成的各个可迭代对象的元素，一个接一个，无缝衔接在一起。  \\
+        \midrule
+        \texttt{itertools} & \texttt{product(it1,...,repeat=1)} & 计算笛卡尔积； \texttt{repeat} 指明重复处理多少次输入的可迭代对象。  \\
+        \midrule
+        (内置) & \texttt{zip(it1,...)} & 并行从输入的各个可迭代对象中获取元素，产出 N 个元素组成的元组。  \\
+        \midrule
+        \texttt{itertools} & \tabincell{c}{\texttt{zip\_longest(it1,...,}\\\texttt{fillvalue=None)}} & 与上一个函数类似，但持续到最长的对象，空缺值使用 \texttt{fillvalue} 填充。  \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{python}
+>>> import itertools
+>>> list(itertools.chain('ABC', range(2)))  # 依次产出元素
+['A','B','C',0,1]
+>>> list(itertools.chain.from_iterable(enumerate('ABC')))   # 从生成其中依次产出元素
+[0,'A',1,'B',2,'C']
+>>> list(zip('ABC',range(5)))   # 并行取出元素
+[('A',0),('B',1),('C',2)]
+>>> list(itertools.zip_longest('ABC',range(5)))     # 并行取出(最长)
+[('A',0),('B',1),('C',2),(None,3),(None,4)]
+>>> list(itertools.product('ABC',range(2)))     # 笛卡尔积
+[('A',0),('A',1),('B',0),('B',1),('C',0),('C',1)]
+\end{python}
+
+有些生成器函数会从一个元素中产出多个值，扩展输入的可迭代对象：
+\begin{table}[H]
+    \centering
+    \caption{把输入的各个元素扩展成多个输出元素的生成器函数}
+    \label{table:把输入的各个元素扩展成多个输出元素的生成器函数}
+    \setlength{\tabcolsep}{2mm}
+    \small
+    \begin{tabular}{l|l|p{10cm}}
+        \toprule
+        \textbf{模块} & \textbf{函数} & \textbf{说明} \\
+        \midrule
+        \texttt{itertools} & \tabincell{l}{\texttt{combinations} \\ \texttt{(it,out\_len)}} & 把 \texttt{it} 产出的 \texttt{out\_len} 个元素组合在一起，然后产出 \\ \midrule
+        \texttt{itertools} & \tabincell{l}{\texttt{combinations\_with\_re} \\ \texttt{placement(it,out\_len)}} & 把 \texttt{it} 产出的 \texttt{out\_len} 个元素组合在一起，然后产出，包含相同元素的组合 \\ \midrule
+        \texttt{itertools} & \texttt{count(start=0,step=1)} & 从 \texttt{start} 开始不断产出数字，按 \texttt{step} 指定的步幅增加 \\ \midrule
+        \texttt{itertools} & \texttt{cycle(it)} & 从 \texttt{it} 中产出各个元素，存储各个元素的副本，然后按顺序重复不断地产出各个元素 \\ \midrule
+        \texttt{itertools} & \tabincell{l}{\texttt{permutations} \\ \texttt{it,out\_len=None}} & 把 \texttt{out\_len} 个 \texttt{it} 产出的元素排列在一起，然后产出这些排列； \texttt{out\_len} 的默认值等于 \texttt{len(list(it))} \\ \midrule
+        \texttt{itertools} & \texttt{repeat(item,[times])} & 重复不断地产出指定的元素，除非提供 items，指定次数。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+演示 \texttt{count, repeat, cycle} 的用法：
+
+\begin{python}
+>>> ct = itertools.count()      # 累加
+>>> next(ct), next(ct)
+(0,1)
+>>> cy = itertools.cycle('ABC')     # 循环
+>>> list(itertools.islice(cy,7))
+['A','B','C','A','B','C','A']
+>>> rp = itertools.repeat(7)    # 重复
+>>> next(rp), next(rp)
+(7,7)
+\end{python}
+
+组合生成器(其余三个生成器函数)用法：
+\begin{python}
+>>> list(itertools.combinations('ABC',2))
+[('A','B'),('A','C'),('B','C')]
+>>> list(itertools.combinations_with_replacements('ABC',2))
+[('A','A'),('A','B'),('A','C'),('B','B'),('B','C'),('C','C')]
+>>> list(itertools.product('ABC', repeat=2))
+[('A','A'),('A','B'),('A','C'),('B','A'),('B','B'),('B','C'),('C','A'),('C','B'),('C','C')]
+\end{python}
+
+最后一组生成器函数用于产出输入的可迭代对象中的全部元素，不过会以某种方式重新排列。
+
+\begin{table}[H]
+    \centering
+    \caption{用于重新排列元素的生成器函数}
+    \label{table:用于重新排列元素的生成器函数}
+    \setlength{\tabcolsep}{2mm}
+    \small
+    \begin{tabular}{l|l|p{11cm}}
+        \toprule
+        \textbf{模块} & \textbf{函数} & \textbf{说明} \\
+        \midrule
+        \texttt{itertools} & \tabincell{l}{\texttt{groupby} \\ \texttt{(it,key=None)}} & 产出由两个元素组成的元素，形式为 \texttt{(key,group), 其中 \texttt{key} 是分组标准， \texttt{group} 是生成器，用于产出分组里的元素。}  \\ \midrule
+        (内置) & \texttt{reversed(seq)} & 从后向前，倒序产出 \texttt{seq} 中的元素， \texttt{seq} 必须是序列，或者实现了 \texttt{\_\_reversed\_\_} 特殊方法的对象。 \\ \midrule
+        \texttt{itertools} & \texttt{tee(it,n=2)} & 产出一个由 \texttt{n} 个生成器组成的元组，每个生成器用于单独产出输入的可迭代对象中的元素。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\texttt{itertools.groupby} 生成器函数的用法
+
+\begin{python}
+>>> list(itertools.groupby('LLLLAAGGG'))
+[('L', <itertools._grouper object at 0x000001CF2156C7C8>), 
+('A', <itertools._grouper object at 0x000001CF2156C848>), 
+('G', <itertools._grouper object at 0x000001CF2156C8C8>)]
+>>> animals = ['duck','eagle','rat','giraffe','bear','bat','dolphin','shark','lion']
+>>> animals.sort(key=len)
+>>> for length,group in itertools.groupby(animals,len):
+...     print(length, '->', list(group))
+3 -> ['rat', 'bat']
+4 -> ['duck', 'bear', 'lion']
+5 -> ['eagle', 'shark']
+7 -> ['giraffe', 'dolphin']
+\end{python}
+
+\texttt{itertools.tee} 生成器函数的用法
+
+\begin{python}
+>>> list(itertools.tee('ABC'))
+[<itertools._tee object at 0x000001CF21572108>, <itertools._tee object at 0x000001CF21572148>]
+>>> g1, g2 = itertools.tee('ABC')
+>>> next(g1)
+'A'
+>>> next(g2)
+'A'
+\end{python}
+
+\subsection{新句法 \texttt{yield from}}
+
+\texttt{yield from} 是 Python3.3 中新出现的句法。如果生成器函数需要产出一个生成器生成值，传统的解决方法是使用嵌套的 \texttt{for} 循环。\footnote{标准库中的 \texttt{chain} 函数是用C语言写的。}
+
+\begin{python}
+>>> def chain(*iterables):
+...     for it in iterables:
+...         for i in it:
+...             yield i
+... 
+>>> s = 'ABC'
+>>> t = tuple(range(3))
+>>> list(chain(s,t))
+['A','B','C',0,1,2]
+\end{python}
+
+\texttt{chain} 生成器函数把操作依次交给接收到的各个可迭代对象处理。为此，引入了一个新句法，如下述代码所示：
+
+\begin{python}
+>>> def chain(*iterables):
+...     for it in iterables:
+...         yield from it
+\end{python}
+
+可以看出， \texttt{yield from} 完全代替了内层的 \texttt{for} 循环。除了代替循环之外，\texttt{yield from} 还会创建通道，把内层生成器直接与外层生成器的客户端联系起来。\footnote{后文会有更详细的说明。}
+
+\subsection{可迭代的归约函数}
+
+归约函数接受一个可迭代的对象，然后返回单个结果。下表列出的规约函数其实都可以使用 \texttt{functools.reduce} 函数实现，内置是因为使用它们便于解决常见的问题。此外，对 \texttt{all} 和 a\texttt{ny} 函数来说，有一项重要的优化措施是 \texttt{reduce} 函数做不到的：这两个函数会短路。(一旦确定解决立马停止计算)
+
+\begin{table}[H]
+    \centering
+    \caption{读取迭代器，返回单个值的内置函数}
+    \label{table:读取迭代器，返回单个值的内置函数}
+    \setlength{\tabcolsep}{2mm}
+    \small
+    \begin{tabular}{l|l|p{11cm}}
+        \toprule
+        \textbf{模块} & \textbf{函数} & \textbf{说明} \\
+        \midrule
+        (内置) & \texttt{all(it)} & \texttt{it} 中所有元素都为真时返回 \texttt{True}，空值返回 \texttt{True} \\ \midrule
+        (内置) & \texttt{any(it)} & \texttt{it} 中存在元素为真时返回 \texttt{True}，空值返回 \texttt{False}  \\ \midrule
+        (内置) & \tabincell{l}{\texttt{max(it,[key=,]} \\ \texttt{[default=])}} & 返回最大元素， \texttt{key} 是排序函数，如果可迭代对象为空，返回 \texttt{default} \\ \midrule
+        (内置) & \tabincell{l}{\texttt{min(it,[key=,]} \\ \texttt{[default=])}} & 返回最小元素， \texttt{key} 是排序函数，如果可迭代对象为空，返回 \texttt{default}  \\ \midrule
+        \texttt{functools} & \tabincell{l}{\texttt{reduce(func,it,} \\ \texttt{[initial])}} & 把前两个元素传给 \texttt{func}，然后把计算结果和第三个元素传给 \texttt{func}；如果提供了 \texttt{initial} 则将其作为第一个元素。  \\ \midrule
+        (内置) & \texttt{sum(it,start=0)} & 计算总和，如果提供了 \texttt{start} 会把它加上。  \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+还有一个内置的函数接受一个可迭代对象，返回不同的值 —— \texttt{sorted}。 \texttt{reversed} 是生成器函数，与此不同， \texttt{sorted} 会构建并返回真正的列表。
+
+\subsection{深入分析 \texttt{iter} 函数}
+
+如前所述，在 Python 中迭代对象 \texttt{x} 时会调用 \texttt{iter(x)}。
+
+\texttt{iter} 函数还有一个鲜为人知的用法：传入两个参数，使用常规函数或任何可调用的对象创建迭代器。这样使用时，第一个参数必须是可调用对象，用于不断调用，产出值；第二个参数是哨符，这是个标记值，当可调用的对象返回这个值时，触发迭代器抛出 \texttt{StopIteration} 异常，而不产出哨符。
+
+应用这个特性，我们构建一个致骰子游戏，知道掷出1点为止：
+\begin{python}
+>>> def d6():
+...     return randint(1,6)
+... 
+>>> d6_iter = iter(d6,1)
+>>> for roll in d6_iter:
+...     print(roll)
+... 
+4 3 6 3
+\end{python}
+
+这里绝对不对产生1，因为1是我们的哨符。
+
+内置函数 \texttt{iter} 的文档中有个使用的例子。这段代码逐行读取文件，直到遇到空行或者到达文件末尾位置：
+\begin{python}
+with open('mydata.text') as fp:
+    for line in iter(fp.readline, '\n'):
+        process_line(line)
+\end{python}
+
+本章到这里结束，原书 P360 页还有对数据处理方面的介绍。
+
+\newpage

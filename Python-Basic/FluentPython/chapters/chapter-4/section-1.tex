@@ -1,0 +1,186 @@
+\chapter{面向对象惯用法}
+\section{对象引用，可变性和垃圾回收}
+\subsection{变量不是盒子}
+
+Python 的变量类似于 Java 中的引用式变量，因此最好把它理解为附加在对象上的标注。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-1.py}
+
+在上面例子中，如果将 \texttt{a,b} 理解为单独的盒子的话，在 \texttt{a} 中装入新元素，但查看 \texttt{b} 时却也出现了新元素。 如果将列表整体视为一个物品， \texttt{a,b} 仅是在上面的标签，这样更正确，因为 \texttt{a,b} 的本质只是一个指向具体内存地址的指针。
+
+为了理解 Python 中的赋值语句，应该始终先读右边。对象在右边创建或获取，在此之后左边的变量才会绑定到对象上，这就像为对象贴上标注。
+
+\subsection{标识，相等性和别名}
+
+因为变量只不过是标注，所以无法阻止贴多个标注，标注贴多了，就是别名。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-3.py}
+
+如果我们重新创建一个数据相同的字典，并将某个变量分配给它，这个变量就不是上一个变量别名，它们指向不同的内存空间：
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-4.py}
+
+关于 \texttt{id()} 函数，在 CPython(最常用的解释器) 中，它会返回对象的内存地址，在其他解释器中可能式别的值，但是关键的是，它的返回值一定是唯一的数值标注，而且在对象的生命周期中绝对不会变。
+
+\subsubsection{在 \texttt{==} 和 \texttt{is} 之间选择}
+
+\texttt{==} 运算符比较两个对象的值(对象中保存的数据，内存地址中的二进制数据)，而 \texttt{is} 比较对象的标识(内存地址)。
+
+我们最常用的是 \texttt{==} 比较值，然而，在变量与单列值之间比较时，应该使用 \texttt{is}。目前，最常使用 \texttt{is} 检测变量绑定值是不是 \texttt{None}：
+
+\begin{python}
+x is None       # 判定
+x is not None   # 否定写法
+\end{python}
+
+\texttt{is} 运算符比 \texttt{==} 速度快，因为它不能重载，所以 Python 不用寻找并调用特殊方法，而是直接比较整数 ID。 而 \texttt{a==b} 是语法糖，等同于 \texttt{a.\_\_eq\_\_(b)}。继承自 \texttt{object} 的 \texttt{\_\_eq\_\_} 比较两个对象的 ID，结果与 \texttt{is} 一样，但是多数内置类型使用更有意义的方法覆盖了该方法，会考虑对象属性的值。相等性测试可能涉及大量处理工作，例如，比较大型集合或嵌套层级深的结构时。
+
+\subsubsection{元组的相对不可变性}
+
+元组与多数 Python 集合(列表，字典，集，等等)一样，保存的是对象的引用。\footnote{\texttt{str}, \texttt{bytes}, \texttt{array.array} 等单一类型序列是扁平的，它们保存的不是引用而是在连续内存中数据本身}如果引用的元素是可变的，即使元组本身不可变，元素依然可变。也就是说，元组的不可变性，是指元组存储的引用不可变，与引用的对象无关。
+
+元组的相对不可变性解释了之前的谜题，这也是有些元组不可散列的原因。
+
+\subsection{默认做浅复制}
+
+复制列表(多数内置的可变集合)最简单的方式是使用内置的类型构造方法：
+
+\begin{python}
+>>> l1 = [3,[55,44],(7,8,9)]
+>>> l2 = list(l1)       # 创建副本
+>>> l2
+[3,[55,44],(7,8,9)]
+>>> l1 == l2            # 副本与源列表相等
+True
+>>> l1 is l2            # 二者指代不同的对象
+False
+\end{python}
+
+对列表和其它可变序列来说，还能使用更为简洁的 \texttt{l2 = l1[:]} 语句创建副本。
+
+然而，构造方法或者 \texttt{[:]} 做的是浅复制(即复制了最外层的容器，副本中的元素是源容器中元素的引用)。如果所有元素都是不可变的，这样没有问题还节省内存。但如果有可变元素，这就会导致意想不到的问题。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-6.py}
+
+\noindent\textbf{对任意对象做深复制和浅复制}
+
+浅复制没什么问题，但有时我们需要的是深复制(即副本不共享内部对象的引用)。 \texttt{copy} 模块提供的 \texttt{deepcopy} 和 \texttt{copy} 函数能为任意对象做深复制和浅复制。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-8.py}
+
+一般来说，深复制不是件简单的事。如果对象有循环引用，那么这个朴素的算法会进入无限循环。 \texttt{deepcopy} 函数会记住已经复制的对象，因此能更优雅地处理循环引用。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-10.py}
+
+此外，深复制有时可能太深了。例如，对象可能会引用不该复制地外部资源或单列值。我们可以实现特殊方法 \texttt{\_\_copy\_\_} 和 \texttt{\_\_deepcopy\_\_}，控制对应的行为。
+
+\subsection{函数的参数作为引用时}
+
+Python 唯一支持的参数传递模式是共享传参，多数面向对象语言都采用这一模式。共享传参指函数的各个形式参数获得参数中各个引用的副本。也就是说，函数内部的形参是实参的别名。
+
+这种方案的结果是，函数可能会修改作为参数传入的可变对象，但是无法修改那些对象的标识(即不能把一个对象替换成另一个对象)。下面看一个例子：
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-11.py}
+
+\subsubsection{不要使用可变类型作为参数的默认值}
+
+可选参数可以有默认值，这样我们的 API 在进化的同时能保证向后兼容。然而，我们应该避免使用可变的对象作为参数的默认值。
+
+下面我们定义了一个类似例 8-8 的类，修改了 \texttt{\_\_init\_\_} 方法，将 \texttt{passengers} 的默认值改成 \texttt{[]} 而不会是 \texttt{None}。这样似乎就不用 \texttt{if} 判断了，但麻烦随之而生。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-12.py}
+
+上面这个例子的问题出在，\texttt{bus2} 和 \texttt{bus3} 实际上维护了同一张乘客表。出现这个问题的根源是：默认值在定义函数时计算(通常在加载模块时)，因此默认值变成了函数对象的属性。也就是说，如果默认值使用可变对象，所有使用默认值构造的函数的对应属性都是同一个对象的别名。因此，如果修改了默认参数的值，那么后续的函数调用都将受影响。
+
+\begin{python}
+>>> dir(HauntedBus.__init__.__defaults__)
+(['Alice'])     # 默认参数被改变
+>>> HauntBus.__init__.__defaults__[0] is bus2.passengers
+True            # bus2.passengers 是个别名
+\end{python}
+
+为什么 Python 会这样设计？据笔者个人猜测，这样是为了提高性能，仅在导入模块时将默认变量初始化一次，而后的函数调用只需要取对应默认变量的值即可，这样可以避免每次调用函数时都初始化一次默认参数。
+
+\subsubsection{防御可变参数}
+
+如果定义的函数接收可变参数，应该谨慎考虑调用方是否期望修改传入的参数。
+
+让我们看一个反面例子，下车的人在队伍列表中也消失了。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-15.py}
+
+上面的问题就在于，\texttt{bus} 中的 \texttt{self.passengers} 实际上与 \texttt{team} 共享了同一张表。正确的做法是，校车应该子集维护一张单独的乘客表，修改的方式也很简单：将参数值的副本传给 \texttt{self.passengers}。
+
+\begin{python}
+def __init__(self,passengers = None):
+    if passengers is None:
+        self.passengers = []
+    else:
+        self.passengers = list(passengers)
+\end{python}
+
+此外还有一点要注意的是，上面代码用的是浅复制，因为列表中所有元素都是扁平的，如果不是，可能要用 \texttt{copy.deepcopy()} 进行深赋值。\footnote{这段话为笔者自己加的。}
+
+\subsection{\texttt{del} 和垃圾回收}
+
+\texttt{del} 语句删除名称，而不是对象。 仅当删除的变量保存的是对象的最后一个引用，或无法得到对象\footnote{两个对象相互引用时，当它们的引用只存在于两者之前，垃圾回收程序会判定它们都无法获取，进而把它们都销毁。}时，\texttt{del} 命令会导致对象被当作垃圾回收。重新绑定也可能会导致对象的引用数量归零，导致对象被销毁。
+
+在 CPython 中，垃圾回收使用的主要算法时引用计数。实际上，每个对象都会统计有多少个引用指向自己。当引用计数归零时，对象就立即被销毁：CPython 调用 \texttt{\_\_del\_\_} 方法，然后释放分配给对象的内存。
+
+为了演示对象生命结束时的情形，下面使用 \texttt{weakref.finalize} 注册一个回调函数，在销毁对象时调用。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-16.py}
+
+上例明确指出 \texttt{del} 不会删除对象，但是执行 \texttt{del} 操作后可能会导致对象不可获取，从而被删除。
+
+\subsection{弱引用}
+
+正是因为有引用，对象才会在内存中存在。当对象的引用数量归零后，垃圾回收程序会把对象销毁。但是，有时需要引用对象，而不让对象存在的时候超过所需的时间。这经常用在缓存中。
+
+弱引用是可调用的对象，返回的是被引用的对象；如果所指对象不存在了，返回 \texttt{None}。
+
+弱引用不会增加对象的引用数量。引用的目标对象称为所指对象。因此我们说，弱引用不会妨碍所指对象被当作垃圾回收。
+
+弱引用在缓存应用中很有用，因为我们不想仅因为被缓存引用着而始终保存缓存对象。
+
+下面示例展示了如何使用 \texttt{weakref.ref} 实例获取所指对象。如果对象存在，调用弱引用可以获取对象，否则返回 \texttt{None}。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-17.py}
+
+\texttt{weakref} 模块的文档指出， \texttt{weakref.ref} 类其实是低层接口，供高级用途使用，多数程序最好使用 \texttt{weakref} 集合和 \texttt{finalize}。
+
+\subsubsection{\texttt{WeakValueDictionary} 简介}
+
+\texttt{WeakValueDictionary} 类实现的是一种可变映射，里面的值是对象的弱引用。被引用的对象在程序中的其他地方被当作垃圾回收后，对应的键会自动从 \texttt{WeakValueDictionary} 中删除。因此 \texttt{WeakValueDictionary} 经常用于缓存。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/8-18.py}
+
+\texttt{weakref} 模块还有很多有用的方法，请读者自行查阅文档了解。
+
+\subsubsection{弱引用的局限}
+
+不是每个 Python 对象都可以作为弱引用的目标。基本的 \texttt{list} 和 \texttt{dict} 实例不能作为所指对象，但是它们的子类可以轻松地解决这个问题。
+
+\begin{python}
+class MyList(list):
+    '''list 的子类，实例可以作为弱引用的目标'''
+
+a_list = MyList(range(10))
+wref_to_a_list = weakref.ref(a_list)
+\end{python}
+
+\texttt{set} 实例可以作为所指对象。但是 \texttt{int} 和 \texttt{tuple} 实例不能作为弱引用的目标，子类也不行。
+
+\subsection{Python 对不可变类型施加的把戏}
+
+本节讨论的是 Python 的实现细节，可以跳过。
+
+对于元组 \texttt{t} 来说， \texttt{t[:]} 不创建副本，而是返回同一个对象的引用。此外，\texttt{tuple(t)} 获得的也是同一个元组的引用。
+
+\texttt{str}， \texttt{bytes}， \texttt{frozenset} 也有这种行为。其中 \texttt{frozenset} 实例不是序列，因此不能使用 \texttt{[:]}，但是\texttt{ fs.copy()} 具有相似的效果。
+
+共享字符串字面量是一种优化措施，称为驻留。CPython 还会在小的整数上使用这个优化措施，防止重复创建 ``热门'' 数字。但并不是所有字符串和数字都会采用驻留，这是实现细节，没有文档说明。
+
+这些令人难以记作的操作是 Python 为了节省内存，提升速度的优化行为。这并不会带来任何麻烦，因此只有不可变类型会受到影响，我们平时也无需在意这些细枝末节\footnote{装逼的时候可以}。
+
+\newpage

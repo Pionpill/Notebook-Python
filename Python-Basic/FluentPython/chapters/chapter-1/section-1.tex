@@ -1,0 +1,36 @@
+\newpage
+
+\chapter{序幕}
+\section{Python 数据模型}
+\subsection{内置函数}
+\subsubsection{内置函数的概念}
+
+Python 语言往往使用 len(object) 的方式获取对象的长度，而 C++，Java 等语言在获取类长度时，需要自行在类中定义相关函数，而后采用成员方法或调用成员变量(object.len())的方式获取相关值。
+
+这是由于 python 编译器使用了名为内置函数的方式，这样有许多好处，例如内置函数的计算速度比成员函数快许多，许多常用的操作在定义内置函数后将变得极其容易使用。
+
+内置函数的通常使用 \_\_function\_\_ 的形式。
+
+\lstinputlisting[language=Python]{../../Scripts/Introduction/1-1.py}
+
+上例中使用了三个内置函数，其中 \_\_init\_\_ 类似于 C++ 的构造函数，用于创建对象。\_\_len\_\_ 函数的定义使得我们可以调用 len() 函数，而 \_\_getitem\_\_ 的定义允许我们对 FrenchDeck 类创建的对象进行迭代，以及类似 C++ 中的数组操作\footnote{原文对这些操作做了精巧的解释，如果读者不清楚，还请阅读原文}。
+
+\subsubsection{内置函数的进一步理解}
+
+内置函数的用处远比一般的成员方法多得多。其左右在 Scripts/introduction 文件下的几个脚本中有所体现。下面归纳几个常用的内置函数的作用。
+
+\begin{itemize}
+    \item \textbf{\_\_getitem\_\_}
+    
+    实现了该方法的类将自带一个迭代器，也即我们可以使用 for x in object 这类的迭代器操作，同时也可以使用 object[i] 这样类似 C++ 通过下标取值的操作。甚至于可以调用标准库的随机函数进行随机选取的操作。
+
+    \item \textbf{\_\_repr\_\_}
+    
+    该方法的实现，能把一个对象用字符串的形式表达出来以便辨认。如果没有实现该方法，在控制台打印实例时将出现 <xxx object at 0x......> 的形式。对应的还有一个 \_\_str\_\_ 内置方法，该方法实在 str() 函数被调用时使用，或是使用 print() 打印对象时使用，如果 \_\_str\_\_ 没有被实现，在相关操作中将会调用 \_\_repr\_\_替代。
+\end{itemize}
+
+这里只列举了两个例子来说明内置函数的强大之处，更多例子在原书中有解释，但原书也并没有对全部内置函数解释，各个内置函数的具体作用还需要在实践使用中理解。
+
+\lstinputlisting[language=Python]{../../Scripts/Introduction/1-2.py}
+
+\newpage

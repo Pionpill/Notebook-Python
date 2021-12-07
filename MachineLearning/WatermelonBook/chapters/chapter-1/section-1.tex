@@ -1,0 +1,137 @@
+\chapter{机器学习基础}
+
+\section{绪论}
+
+周志华先生的行文风格更贴近于生活，一些术语并没有给出标准解释，而是用例子来说明。因此这章的许多解释都是本人的总结，更为标准的解释可以参考《统计学习方法》一书的笔记。
+
+\subsection{基本术语}
+
+\subsubsection{数据相关}
+
+\begin{itemize}
+    \item \textbf{数据集(data set)}
+    
+    记录的集合，记录包括属性与值，通常形式为(属性1 = 值1;属性2 = 值2;...)。
+    \item \textbf{示例/样本(instance/sample)}
+    
+    数据集中的单条记录称为一个样本。有时整个数据集也称为一个样本\footnote{因为一般数据集不可能等于样本空间，故可看作对样本空间的采样}。
+    \item \textbf{属性/特征(attribute/feature)}
+    
+    在某方面的表现或性质的事项，对应值为属性值/特征值。
+    \item \textbf{属性空间/样本空间/输入控件}
+    
+    属性张成的空间(属性作笛卡尔积?)
+    \item \textbf{特征向量(feature vector)}
+    
+    一个示例
+\end{itemize}
+
+令$D = \{\bm{x}_1,\bm{x}_2,\cdots,\bm{x}_m\}$ 表示包含 $m$ 个示例的数据集，每个示例由 $d$ 个属性描述，则每个示例 $\bm{x}_i = (x_{i1};x_{i2};\cdots;x_{id})$ 是 $d$ 维样本空间 $\mathcal{X}$ 中的一个向量。$\bm{x}_i \in \mathcal{X}$；其中 $x_{ij}$ 是第 $j$ 个属性上的取值，$d$ 称为样本\textbf{维度(dimensionality)}。
+
+\subsubsection{训练相关}
+
+\begin{itemize}
+    \item \textbf{学习/训练(learning/training) }
+    
+    从数据中学习模型的过程。
+    \item \textbf{假设(hypothesis)}
+    
+    学到的模型对应了关于数据的某种潜在的规则。
+    \item \textbf{真相/真实(ground-truth)}
+    
+    潜在规律。
+    \item \textbf{标记(label)}
+    
+    关于示例结果的信息。如是好瓜/不是好瓜
+    \item \textbf{样例(example)}
+    
+    拥有了标记信息的示例。一般用 $(\bm{x}_i,y_i)$表示，其中 $y_i \in \mathcal{Y}$ 为标记。
+    \item \textbf{输出空间(label space)}
+    
+    所有标记的集合。
+\end{itemize}
+
+\subsubsection{模型相关}
+
+\begin{itemize}
+    \item \textbf{分类(classification)}
+    
+    输出空间包含的是离散值。若只涉及两个值，称为二分类(binary classification)。通常称其中一个为正类(positive class)，一个为反类(negative class)。
+    \item \textbf{ 回归(regression)}
+    
+    输出空间包含的是连值。
+\end{itemize}
+
+一般预测任务是希望通过对训练集进行学习，建立一个从输入空间到输出空间的映射：$\mathcal{X} \rightarrow \mathcal{Y}$。对于二分类任务，通常令 $\mathcal{Y} = \{-1,+1\} \text{或} {0,1}$；对多分类任务，$|\mathcal{Y}|>2$；对回归任务，$\mathcal{Y} = \mathbb{R}(\text{实数集})$。
+
+\begin{itemize}
+    \item \textbf{聚类(clustering)}
+    
+    将训练集中的数据分成若干组，每组称为一个簇(cluster)。
+\end{itemize}
+
+根据训练数据是否拥有标记信息，学习任务大致可分为两大类："监督学习"(supervised learning)和"无监督学习"(unsupervised learning)。分类和回归是前者的代表，聚类是后者的代表。
+
+\begin{itemize}
+    \item \textbf{泛化(generalization) }
+    
+    学得模型适用于新样本的能力。泛化能力的大小是评判模型好坏的重要标志之一。
+\end{itemize}
+
+通常，假设样本空间中全体样本服从一个未知"分布"(distribution)$\mathcal{D}$，我们获得的每个样本都是独立地从这个分布采样获得的，即\textbf{独立同分布}。
+
+\subsection{概念学习与归纳偏好}
+\subsubsection{概念学习}
+
+\begin{itemize}
+    \item \textbf{归纳(induction)}
+    
+    从许多个别的事物中概括出一般性概念、原则或结论的思维方法。
+    \item \textbf{演绎(deduction)}
+    
+    由一般原理推出关于特殊情况下的结论。
+\end{itemize}
+
+归纳学习(induction learning)，即从样例中学习，有侠义与广义之分，广义的归纳学习大体相当于从样例中学习，而狭义的归纳学习则要求从训练数据中学到概念，也称概念学习\footnote{概念学习不是重点，具体例子可见书 P4}。
+
+\subsubsection{归纳偏好}
+
+\textbf{归纳偏好(inductive bias)}指机器学习算法在学习过程中对某种类型假设的偏好。任何有效的机器学习必然有其归纳偏好。"奥卡姆剃刀"\footnote{若有多个假设与观察一致，则选最简单的那个。}是一种常用的一般性原则来引导算法确定"正确的"偏好，但也有例外\footnote{书P6-9详细解释了归纳偏好及其解决方案，但多为理解性内容，若需进一步理解请读者查看原书}。
+
+\subsection{发展历程}
+
+机器学习是人工智能研究发展到一定阶段的必然产物。
+
+\subsubsection{发展历史}
+
+\begin{itemize}
+    \item \textbf{二十世纪五十年代到七十年代 (推理期)} \\
+    认为只要赋予及其逻辑推理能力，机器就能具有智能。\\
+    A.Newell, H.Simon 的"逻辑推理家"程序证明了《数学原理》中的定理，并获得1975年图灵奖。
+    \item \textbf{二十世纪七十年代中期(知识期)} \\
+    由人总结出知识交给计算机
+    \item \textbf{现在} \\
+    由机器自主学习
+\end{itemize}
+
+\subsubsection{主流技术}
+
+\begin{itemize}
+    \item \textbf{符号主义学习}\\
+    以决策树和基于逻辑的学习为代表。直接模拟了人类对该你那进行判断的树形流程。基于逻辑学习的著名代表是归纳逻辑程序设计(Inductive Logic Programming,ILP)。\\
+    决策树学习简单易用，ILP具有很强的知识表示能力，可以容易地表达出复杂数据关系。\\
+    由于表示能力太强，直接导致学习时假设空间太大，复杂度极高，问题规模大时难以有效学习。二十世纪九十年代中期这方面研究逐渐低调。
+
+    \item \textbf{连接主义学习-神经网络}\\
+    二十世纪八十年代之前都不被重视，直到解出 NP 问题。\\
+    连接主义最大的局限是"试错性"；简单地说就是需要手动调节参数，缺乏理论指导。二十世纪九十年代中期也逐渐没落。
+
+    \item \textbf{统计学习} \\
+    代表性技术是向量机，核方法。在二十世纪九十年代中期闪亮登场。
+
+    \item \textbf{深度学习} \\
+    深度学习狭义地说就是"多层"神经网络，属于连接主义。虽然缺乏理论支持，但在模型复杂度高，参数调节好的情况下，深度学习地结果往往十分有效。\\
+    深度学习地兴起与"大数据"和"计算能力提高"有密切关系。\\
+\end{itemize}
+
+\newpage

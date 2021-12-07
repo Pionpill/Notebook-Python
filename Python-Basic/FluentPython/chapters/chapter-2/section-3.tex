@@ -1,0 +1,174 @@
+\section{文本和字节序列}
+\subsection{字符问题}
+
+``字符串''是个简单的概念：一串字符组成的序列，从 Python3 的 \texttt{str} 对象中获取的元素时 Unicode 字符，这相当于从 Python2 的 \texttt{unicode} 对象中获取的元素，而不是从 Python2 的 \texttt{str} 对象中获取的原始字符序列。
+
+Unicode 标准把字符的标识和具体的字节表述进行了如下明确区分。
+\begin{itemize}
+    \item 字符的标识，即码位，时 0-1114111的数字(十进制)，在 Unicode 标准中以 4-6 个十六进制数字表示，前缀 ``U+''。
+    \item 字符的具体表述取决于所用的编码，编码时在码位和字节序列之间转换时使用的算法。
+\end{itemize}
+
+把码位转换成字节序列的过程时编码，把字节序列转换成码位的过程时解码。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/4-1.py}
+
+\subsection{字节概要}
+
+Python 内置了两种基本的二进制序列类型：Python3 引入的不可变的 \texttt{bytes} 类型和 Python2.6 添加的可变 \texttt{bytearray} 类型。\texttt{bytes} 和 \texttt{bytearray} 对象的各个元素时介于 0-255 之间的整数。  
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/4-2.py}
+
+和许多序列类型一样，\texttt{seq[0]} 返回的是元素的类型，而 \texttt{seq[index:index+1]} 返回的则是 \texttt{seq} 类型，往往 \texttt{seq[0] == seq[:1]} 是成立的，但也仅对于 seq 这个类型成立。
+
+二进制序列各个字节的值可能会使用以下三种不同的方式显示：
+\begin{itemize}
+    \item 可打印的 ASCII 范围内的文字，使用 ASCII 本身，也即数字
+    \item 制表符，换行符等，使用转义序列\textbackslash t,\textbackslash n。
+    \item 其他字节类型，使用十六进制转义序列，例如 (\textbackslash x00 是空字节)。
+\end{itemize}
+
+除了格式化方法和几个特殊处理 Unicode 数据的方法之外，\texttt{str} 类型的其他方法都支持二进制序列。\texttt{re} 模块的正则表达式也支持对二进制序列的处理。
+
+二进制序列有个方法是 \texttt{str} 没有的，名为 \texttt{fromhex}，作用是解析十六进制数字对(数字对中间的空格可选)，构建新的二进制序列。
+
+\begin{python}
+bytes.fromhex('31 4B CE A9')    # b'1K\xce\xa9'
+\end{python}
+
+构建 bytes 或 bytearray 示例还可以调用各自的构造方法，传入下述参数：
+\begin{itemize}
+    \item 一个 str 对象和一个 encoding 关键字参数。
+    \item 一个可迭代对象，提供 0-255 之间的数值。
+    \item 一个整数的，使用空字节创建对应长度的二进制序列(已过失)。
+    \item 一个实现了缓冲协议的对象，将源对象中的字节序列复制到新建的二进制序列中。
+\end{itemize}
+
+使用缓冲类对象构建二进制序列是一种低层操作，可能涉及类型转换。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/4-3.py}
+
+\noindent\textbf{结构体和内存视图}
+
+\texttt{struct} 模块提供了一些函数，把打包的字节序列转换成不同类型字段组成的元组，还有一些函数用于执行反向转换，把元组转换成打包的字节序列。\texttt{struct}模块能处理 \texttt{bytes}，\texttt{bytearray}，\texttt{memoryview}对象。
+
+\subsection{基本的编解码器}
+
+Python 自带了超 100 中编解码器，用于在文本和字节之间相互转换。每个编解码器都有一个名称，有的有几个别名，比如 `\texttt{utf\_8}' 别名有 `\texttt{utf8}',`\texttt{utf-8}',`\texttt{U8}'。这些名称可以传给一些函数的 \texttt{encoding} 参数。
+
+\subsection{了解编解码问题}
+
+编解码有个一般性的 UnicodeError 异常，报告错误时几乎都会指明具体的异常
+
+\begin{itemize}
+    \item UnicodeEncodeError：编码错误，在将字符串转换为二进制序列时错误。
+    \item UnicodeDecodeError：解码错误，在将二进制序列转换为字符串时错误。
+    \item SyntaxError：语法错误。
+\end{itemize}
+
+\subsubsection{处理 UnicodeEncodeError}
+
+多数非 UTF 编解码器只能处理 Unicode 字符的一小部分子集。把文本转换成字节序列时，如果目标编码中没有定义某个字符，那就会抛出 \texttt{UnicodeEncodeError} 异常，除非把 \texttt{errors} 参数传给编码方法或函数，对错误进行特殊处理。
+
+\subsubsection{处理 UnicodeDecodeError}
+
+不是每一个字节都包含有效的 ASCII 字符或 UTF 码。因此，将二进制转换为文本时，如果假设是这两个编码中的一个，遇到无法转换的字节序列时会抛出 \texttt{UnicodeError}。
+
+此外，很多陈旧的8位编码，如 `cp1252'，能解码任何字节序列流而不抛出错误，例如随机噪声。这会悄无声息得得到一串无用的输出。
+
+\subsubsection{抛出 SyntaxError}
+
+Python 3 默认使用 UTF-8 编码源码，Python 2 则默认使用 ASCII。如果加载得 .py 模块中包含 UTF-8 之外得数据，而且没有声明编码，会得到 SyntaxError 错误。
+
+为了修复这类问题，可以在 Python 脚本文件顶部天界一个 \texttt{coding} 注释：
+
+\begin{python}
+# coding:cp1252
+\end{python}
+
+现在 Python3 使用 UTF-8 编码，若要修正源码得陈旧编码问题，最好将其转换成 UTF-8 编码，而不是使用 \texttt{coding} 注释。
+
+值得一提的是，Python3 原则上是允许在源码中使用非 ASCII 名称的，原书作者认为这有利有弊。以普遍理性而言，不要这样做。
+
+\subsubsection{如何找出字节序列的编码}
+
+除非有人告诉你字节序列的编码，不然不能找到正确的编码方式。
+
+仅能根据某个字节码出现的频率猜测字节序列的编码，Python 有一个库：Chardet 可以对文件使用这种方式猜测编码方式。
+
+\subsubsection{BOM:有用的鬼符}
+
+观察下面例子：
+\begin{python}
+'El'.encode('utf_16')   # b'\xff\xfeE\x00l\x00'
+\end{python}
+
+可以发现使用 \texttt{utf\_16} 编码的序列开头有几个格外的字节 \texttt{b'\textbackslash xff \textbackslash xfe'}。这是 BOM，即字节序标记(byte-order mark)，指明编码时使用 Intel CPU 的小字节序。在大字节序 CPU 中，编码顺序相反。
+
+UTF-16 有两个变种：UTF-16LE 显示指明使用小写字符， UTF-16BE，显式指明使用大写字符。如果使用这两个变种，则不会生成 BOM\footnote{BOM的概念多为一些协议规则，请根据实际考虑，这里不多做解释。}。
+
+\subsection{处理文本文件}
+
+处理文本一般采用``三明治''方法，即在读入文件时解码输入的字符串，在输出文件时将字符串编码成字节序列。而在处理过程中，只处理字符文本。
+
+Python3 便是采用的这种方法，内置的 \texttt{open} 函数会在读取文件时作必要的解码，在写入文件时进行编码，这样我们就只需要关心字符串的处理\footnote{Python2.7 用户需要使用 io.open() 函数才能在读写文件时自动解码编码}。
+
+可以见得，处理文本文件十分简单。但是依赖默认编码，往往会遇到问题。Python3 在对文件进行读写时，会默认使用操作系统的编码方式，例如国人用的 Window10 系统默认编码为 GBK，这时候如果读取一个 UTF-8 编码的方式则会出现乱码。为了解决这类问题，在涉及到编码解码的函数中都应该传入 \texttt{encoding} 参数。
+
+如果没有设置 \texttt{encoding} 的值，默认值由 \texttt{local.getpreferredencoding()} 提供。
+
+\subsection{为了正确比较而规范化 Unicode 字符串}
+
+Unicode 有组合字符(变音符号和附加到前一个字符上的记号，打印时作为一个整体)，处理起来比较复杂。
+
+\begin{python}
+s1 = 'café'
+s2 = 'cafe\u0301'
+s1 == s2            # False
+\end{python}
+
+上述代码中 \texttt{s1} 和 \texttt{s2} 表达的字符是一致的，在 Unicode 标准中，`é' 和 `e\textbackslash u0303' 这样的序列叫做 `标准等价物'，应用程序应该把它们视作相同的字符。但是 Python 看到的是码位的序列，因此判定二者不同。
+
+这个问题的解决方案是使用 \texttt{unicodedata.normalize} 函数提供的 Unicode 规范化。这个函数的第一个参数是四个字符串中的一个，最常用的两个如下：
+
+\begin{itemize}
+    \item NFC(Normalization Form C)\\
+    使用最少的码位构成等价的字符串。是 W3C 推荐的规范化形式。
+    \item NFD \\
+    把组合字符分解成基字符和单独的组合字符。
+\end{itemize}
+
+西式键盘默认是 NFC 形式，但安全起见最好使用 \texttt{normalize('NFC',user\_text)} 清洗字符串。
+
+还有两个并不常用，一般只在特殊情况使用，这里仅列出不做解释：
+
+\begin{itemize}
+    \item NFKC \\
+    NFC 基础上的严格的规范化格式，多用在一些考虑兼容性的特殊字符处理场合。
+    \item NFKD \\
+    NFD 基础上的严格的规范化格式，多用在一些考虑兼容性的特殊字符处理场合。
+\end{itemize}
+
+\subsubsection{大小写折叠}
+
+大小写折叠其实就是把所有文本变成小写，再做转换。这个功能由 \texttt{str.casefold()} 方法支持。
+
+str.casefold() 方法与 str.lower() 方法处理结果几乎一样，自 Python3.4 起，它们处理得到不同结果的有 116 个码位，而 Unicode 6.3 则有 110122 个字符，占比 0.11\%，处为特殊情况，否则无需在意。
+
+\subsubsection{规范化文本匹配实用函数}
+
+对大多数应用来说，NFC是最好的规范化形式。不区分大小写的比较应该使用str.casefold()。
+如果要处理多语言文本，应该有\texttt{nfc\_equal}和\texttt{fold\_equal}函数。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/4-13.py}
+
+\subsubsection{极端``规范化''：去掉变音符号}
+
+去掉重音符并不是正确的规范化方法，但现实生活往往需要这样做。
+
+\lstinputlisting[language=Python]{../../Scripts/DataStruct/4-14.py}
+
+原文还有一些特殊字符的处理方法，但是本人并不会德语/俄文，作为中文用户也用不到这些操作，故省略，这些内容可参阅原书 104 页。
+
+
+\newpage

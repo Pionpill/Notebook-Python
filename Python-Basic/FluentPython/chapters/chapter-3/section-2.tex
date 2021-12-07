@@ -1,0 +1,259 @@
+\section{使用一等函数实现设计模式}
+\subsection{案例分析：重构``策略''模式}
+
+如果合理利用作为一等对象的函数，某些设计模式可以简化。
+
+\subsubsection{经典的 ``策略'' 模式}
+
+\textit{定义一系列算法，把它们一一封装起来，并且使它们可以相互替换。本模式使得算法可以独立于使用它的客户而变化。}  
+
+\hfill —— <<设计模式：可复用面向对象软件的基础>>
+
+图 \ref{fig:``策略''设计模式} 中的 UML 类图指出的 ``策略'' 模式对类的编排。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (order) at (1,0) [draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Order} \\
+                \midrule
+                total() \\
+                due() \\
+            \end{tabular}
+        };
+
+        \node at (1,1.5) {上下文};
+
+        \node (promotion) at (8,0) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Promotion} \\
+                \midrule
+                \textit{discount()} \\
+            \end{tabular}
+        };
+
+        \node at (8,1.5) {策略};
+
+        \node (fidelityPromp) at (3,-4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{FidelityPromp} \\
+                \midrule
+                discount() \\
+            \end{tabular}
+        };
+
+        \node (bulkItemPromo) at (8,-4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{BulkItemPromo} \\
+                \midrule
+                discount() \\
+            \end{tabular}
+        };
+
+        \node (largeOrderPromo) at (13,-4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{LargeOrderPromo} \\
+                \midrule
+                discount() \\
+            \end{tabular}
+        };
+
+        \node at (9,-1.5) {具体策略};
+
+        \begin{scope}
+            \draw [thick,{Diamond[open,length=0.5cm]}-{Latex[round,length=0.5cm]}] (order) -- (promotion);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (fidelityPromp) -- ++ (0,2) -| (promotion);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (largeOrderPromo) -- ++ (0,2) -| (promotion);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (bulkItemPromo) --  (promotion);
+        \end{scope}
+    \end{tikzpicture}
+    \caption{``策略''设计模式}
+    \label{fig:``策略''设计模式}
+\end{figure}
+
+电商领域有个功能可以明显使用 ``策略'' 模式，即根据客户的属性或订单中的商品计算折扣。假定一个网店有以下折扣：
+\begin{itemize}
+    \item 有 1000 积分或以上顾客，每个折扣享 5\% 折扣。
+    \item 同一个订单中，单个商品数量达到 20 个或以上，享 10\% 折扣。
+    \item 订单中不同商品达到 10 个或以上，享 7\% 折扣。
+    \item 一个订单仅能享受一个折扣
+\end{itemize}
+
+结合图 \ref{fig:``策略''设计模式}，各个组成部分意义如下：
+\begin{itemize}
+    \item \textit{上下文} \\
+    把一些计算委托给实现不同算法的可互换组件，它提供服务。在这个例子中，上下文是 \texttt{Order}，它会根据不同的算法计算促销折扣。
+    \item \textit{策略} \\
+    实现不同算法的组件共同的接口。
+    \item \textit{具体策略} \\
+    ``策略''的具体子类。
+\end{itemize}
+
+例6-1实现了这个电商折扣中的方案。在这个示例中，实例化订单之前，系统会以某种方法选择一种促销策略，然后把它传给 \texttt{Order} 构造方法。具体怎么选策略，不在这个模式的职责范围内。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/6-1.py}
+
+在上面这个例子中，把 \texttt{Promotion} 定义为抽象基类(ABC)，这么做是为了使用 @abstractmethod 修饰器，从而明确表明所用的模式。
+
+\subsubsection{使用函数实现``策略''模式}
+
+在实例6-1中，每个具体的策略都是一个类，而且只定义了一个方法 \texttt{discount}。此外，策略实例没有状态(即实例属性)。它们看起来更像普通的函数，下面对它们进行重构\footnote{为减少代码量，不再重复调用实例，仅给出类和函数}，把具体的策略换成了普通的函数。
+
+\lstinputlisting[language=Python]{../../Scripts/Function/6-3.py}
+
+使用参数不仅减少了代码量，而且调用函数比实例化类更简单。
+
+\subsubsection{选择最佳策略：简单的方式}
+
+下面我们定义一个函数 \texttt{best\_promo} 来选者折扣最大的方案。
+
+\begin{python}
+promos = [fidelityPromp,bulk_item_promo,large_order_promo]
+
+def best_promo(order):
+    '''选择最佳折扣'''
+    return max(promo(order) for promo in promos)
+\end{python}
+
+在习惯了一等函数后，自然而然会像上述代码一样构建数据结构存储函数，并用生成器表达式使用函数。
+
+这样定义最佳方案选择函数简单且易于阅读，但有些复杂情形下并不适用。比如要加入新的折扣方案，这时候就必须重写 \texttt{best\_promo} 函数。
+
+\subsubsection{找出模块中的全部策略}
+
+在 Python 中，模块也是一等对象，而且标准库提供了几个处理模块的函数。Python 文档是这样说明内置函数 \texttt{globals} 的。
+
+\begin{itemize}
+    \item \texttt{globals()} \\
+    返回一个字典，表示当前的全局符号表。这个符号表始终指向当前模块(对函数或方法来说，是指定义它们的模块，而不是调用它们的模块)。
+\end{itemize}
+
+下面例子使用 \texttt{globals} 函数帮助 \texttt{best\_promo} 自动找到其他可用的 \texttt{*\_promo} 函数，过程有点曲折。
+
+\begin{python}
+promos = [globals()[name] for name in globals() # 迭代 globals() 返回字典中各个 name
+          if name.endswith('_promo')
+          and name != 'best_promo']             # 对各个 name 进行赛选
+
+def best_promo(order):
+    '''选择最佳折扣'''
+    return max(promo(order) for promo in promos)    # 内部代码没有变化
+\end{python}
+
+收集所有可用促销的另一种方法是，在一个单独的模块中保存所有策略函数，把 \texttt{best\_promo} 排除在外。
+
+\begin{python}
+promos = [func for name,func in inspect.getmembers(promotions, inspect.isfunction)]
+
+def best_promo(order):
+    '''选择最佳折扣'''
+    return max(promo(order) for promo in promos)    # 内部代码没有变化
+\end{python}
+
+在上面代码中，最大的变化是内省名为 \texttt{promotions} 的独立模块，构建策略函数列表。注意要导入 \texttt{promotions} 模块。\texttt{inspect.getmembers} 函数用于获取对象的属性，第二个参数是可选的判断条件(一个布尔函数)。
+
+不管怎么明明策略函数，上例都可用。唯一重要的是， \texttt{promotions} 模块只能包含计算订单折扣的函数。如果有人在 \texttt{promotions} 模块中使用不同的签名定义函数，那么 \texttt{best\_promo} 函数常识将其应用到订单上时会出错。
+
+动态收集促销折扣函数的一种更为显示的方法是使用装饰器，将在下一节讨论。
+
+\subsection{``命令''模式}
+
+``命令''设计模式将函数作为参数传递而简化。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (application) at (0,0) [draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{Application} \\
+            \end{tabular}
+        };
+
+        \node at (0,1) {客户端};
+        \node at (1,-1) {接收者};
+        
+        \node (menu) at (3,0) [draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{Menu} \\
+            \end{tabular}
+        };
+
+        \node at (3,1) {调用者};
+
+        \node (command) at (8,0) [minimum width=3cm,draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{Command} \\
+                \midrule
+                \textit{execute()} \\
+            \end{tabular}
+        };
+
+        \node at (8,1.5) {命令};
+
+        \node (openCommand) at (3,-3.5) [minimum width=3cm,draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{OpenCommand} \\
+                \midrule
+                execute() \\
+            \end{tabular}
+        };
+
+        \node (pasteCommand) at (8,-3.5) [minimum width=3cm,draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{PasteCommand} \\
+                \midrule
+                execute() \\
+            \end{tabular}
+        };
+
+        \node (macroCommand) at (13,-3.5) [minimum width=3cm,draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{MacroCommand} \\
+                \midrule
+                execute() \\
+            \end{tabular}
+        };
+
+        \node at (9,-1.5) {具体命令};
+
+        \node (document) at (8,-6) [minimum width=3cm,draw,font=\footnotesize,thick] {
+            \begin{tabular}{c}
+                \textbf{Document} \\
+                \midrule
+                insert\_text() \\
+            \end{tabular}
+        };
+
+        \node at (5.5,-6) {接收者};
+
+        \begin{scope}
+            \draw [thick,{Diamond[open,length=0.4cm]}-{Latex[round,length=0.4cm]}] (menu) -- (command);
+            \draw [thick,-{Latex[round,open,length=0.4cm]}] (openCommand) -- ++ (0,1.5) -| (command);
+            \draw [thick,-{Latex[round,open,length=0.4cm]}] (macroCommand) -- ++ (0,1.5) -| (command);
+            \draw [thick,-{Latex[round,open,length=0.4cm]}] (pasteCommand) --  (command);
+            \draw [thick,-{Latex[round,length=0.4cm]}] (pasteCommand) -- (document);
+            \draw [thick,{Diamond[open,length=0.4cm]}-{Latex[round,length=0.4cm]}] (macroCommand) -- ++(2.5,0) |-  (command);
+            \draw [thick,-{Latex[round,length=0.4cm]}] (openCommand) -| (application);
+        \end{scope}
+    \end{tikzpicture}
+    \caption{``命令''设计模式}
+    \label{fig:``命令''设计模式}
+\end{figure}
+
+``命令''模式的目的是解耦调用操作的对象(调用者)和提供实现的对象(接收者)。这种模式的做法是：在两者之间放一个 \texttt{Command} 对象，让它实现只有一个方法(\texttt{execute})的接口，调用接收者中的方法执行所需的操作。这样，调用者无需了解接收者的接口，而且不同的接收者可以适应不同的 \texttt{Command} 子类。调用者有一个具体的命令，通过调用 \texttt{execute} 方法执行。
+
+我们可以不为调用者提供 \texttt{Command} 实例，而是给它一个函数。此时，调用者不用调用 \texttt{command.execute()} 而是直接调用 \texttt{command()} 即可。\texttt{MacroCommand} 可以实现成定义了 \texttt{\_\_call\_\_} 方法的类。
+
+\begin{python}
+class MacroCommand:
+    '''一个执行一组命令的命令'''
+    def __init__(self,commands):
+        self.commands = list(commands)
+
+    def __call__(self):
+        for command in self.commands:
+            command()
+\end{python}
+
+\newpage

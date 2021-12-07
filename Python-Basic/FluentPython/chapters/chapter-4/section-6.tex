@@ -1,0 +1,285 @@
+\section{正确重载运算符}
+
+本章只讨论一元运算符和中缀运算符。\footnote{其他运算符如函数调用，属性访问等大多不可重载，用户也不能修改用法。}
+
+\subsection{运算符重载基础}
+
+在某些圈子中，运算符重载的名声并不好。比如 Java 禁止用户重载运算符。对此 Python 施加了一些限制，做好了灵活性，可用性和安全性方面的平衡：
+
+\begin{itemize}
+    \item 不能重载内置类型的运算符
+    \item 不能新建运算符，只能重载现有的运算符
+    \item 某些运算符不能重载： \texttt{is, and, or, not}
+\end{itemize}
+
+\subsection{一元运算符}
+
+在 Python 语言参考手册中，列出了三个一元运算符。下面是这三个运算符和对应的特殊方法：
+
+\begin{itemize}
+    \item \texttt{- (\_\_neq\_\_)}
+    
+    一元负数运算符。如果 \texttt{x} 是 \texttt{-2}，那么 \texttt{-x == 2}
+    \item \texttt{+ (\_\_pos\_\_)}
+    
+    一元取正算术运算符。通常\footnote{例外：\texttt{Decimal} 大整数运算，\texttt{collections.Counter} 计算运算。原书 P309 有说明。} \texttt{x == +2}
+    \item \texttt{$\sim$(\_\_invert\_\_)}
+    
+    对整数按位取反，定义 \texttt{$\sim$x == -(x+1)}
+\end{itemize}
+
+除此之外，还有 \texttt{abs()} 函数也被列为了一元运算符。前面已多次提及。
+
+支持一元运算符非常简单，只需实现相应的特殊方法。这些特殊方法只有一个参数：\texttt{self}。不过，要遵守运算符的一个基本规则：始终返回一个新对象。也就是说，不能修改 \texttt{self}，要创建并且返回新的实例。
+
+下面给出了之前定义的 \texttt{Vector} 类实现的几个新运算符：
+
+\begin{python}
+def __abs__(self):
+    return math.sqrt(sum(x*x for x in self))
+
+def __neg__(self):
+    return Vector(-x for x in self)
+
+def __pos__(self):
+    return Vector(self)     # 注意：即使相同，也要构建新的实例。
+\end{python}
+
+\subsection{重载向量加法运算符 +}
+
+两个欧几里得向量加在一起得到的是一个新的向量，它的各个分量是两个向量中相应的分量之和，如果长度不同，则应对部分元素进行相加：
+
+下面在之前定义过的 \texttt{Vector} 类基础上添加加法运算：
+
+\begin{python}
+def __add__(self, other):
+    pairs = itertools.zip_longest(self, other, fillvalue = 0.0) # 生成一个 (a,b) 形式的元组
+    return Vector(a + b for a, b in pairs)  # 返回新的实例
+\end{python}
+
+这里我们使用了 \texttt{zip\_longest} 函数，它能处理任何可迭代对象，但仅当左操作数是 \texttt{Vector} 实例时才有效。
+
+\begin{python}
+>>> v1 = Vector([3,4,5])
+>>> v1 + (10, 20, 30)
+Vector([13.0, 24.0, 35.0])
+>>> (10, 20, 30) + v1
+Traceback (most recent call last):.....
+\end{python}
+
+为了支持涉及不同类型的运算，Python 为中缀运算符特殊方法提供了特殊的分派机制。对 \texttt{a+b} 来说，解释器会提供以下几步操作：
+
+\begin{itemize}
+    \item 如果 \texttt{a} 有 \texttt{\_\_add\_\_} 方法，而且返回值不是 \texttt{NotImplemented}，调用 \texttt{a.\_\_add\_\_(b)}，然后返回结果。
+    \item 如果 \texttt{a} 没有 \texttt{\_\_add\_\_} 方法，或者返回值是 \texttt{NotImplemented}，检查 \texttt{b} 有没有 \texttt{\_\_radd\_\_} 方法，如果有，而且返回值不是 \texttt{NotImplemented}，调用 \texttt{b.\_\_radd\_\_(a)}，然后返回结果。
+    \item 如果 \texttt{b} 没有 \texttt{\_\_radd\_\_} 方法，或者返回值是 \texttt{NotImplemented}，抛出 \texttt{TypeError}。
+\end{itemize}
+
+\texttt{\_\_radd\_\_} 是 \texttt{\_\_add\_\_} 的 ``反射''，``右向'' 版本。以 \texttt{r} 开头的内置方法多为类似功能。
+
+因此，如果我们要实现 \texttt{Vecotr} 实例的 \texttt{(10, 20, 30) + v1} 方法，只需实现 \texttt{\_\_radd\_\_} 内置函数即可。
+
+\begin{python}
+def __add__(self, other):
+    pairs = itertools.zip_longest(self, other, fillvalue = 0.0)
+    return Vector(a + b for a, b in pairs)
+
+def __radd__(self, other):
+    return self + other     # 直接委托给 __add__
+\end{python}
+
+在实现了右向运算后，我们又遇到一个问题：如果提供的对象不可迭代，那么 \texttt{\_\_add\_\_} 就无法处理，此时如果我们强行运算，就会抛出一堆难以理解的错误。对此 Python 有一个规定：如果由于类型不兼容而导致运算符特殊方法无法返回有效的结果，那么应该返回 \texttt{NotImplemented}，而不是抛出 \texttt{TypeError}。返回 \texttt{NotImplemented} 时，另一个操作数所属的类型还有机会执行运算，即 Python 会尝试调用反向方法。
+
+下面是 \texttt{Vector} 加法运算的最终版：
+
+\begin{python}
+def __add__(self, other):
+    try:
+        pairs = itertools.zip_longest(self, other, fillvalue = 0.0)
+        return Vector(a+b for a,b in pairs)
+    except TypeError:
+        return NotImplemented
+\end{python}
+
+\subsection{重载标量乘法运算符 *}
+
+在 \texttt{Vector} 实例中使用乘法运算：\texttt{Vector([1, 2, 3]) * x}。如果 \texttt{x} 是数字，就是计算标量积，结果是一个新 Vector 实例，各个分量都会乘以 \texttt{x} ，这也叫元素级乘法。
+
+涉及乘法运算的还有点积；Numpy 等库目前的做法是，不提供两种意义的 * 运算，而是单独使用 \texttt{dot()} 函数计算点积。
+
+下面我们实现简单的乘法运算：
+
+\begin{python}
+def __mul__(self, scalar):
+    return Vector(n * scalar for n in self)
+
+def __rmul__(self, scalar):
+    return self * scalar
+\end{python}
+
+这里有个问题， \texttt{scalar} 必须是实数，我们可以像加法运算那样使用 \texttt{try} 语句，但有个更易于理解的方法。我们将使用 \texttt{isinstance()} 检查 \texttt{scalar} 的类型，但是不硬编码具体的类型，而是检查 \texttt{numbers.Real} 抽象基类的真实子类或虚拟子类的数值类型。
+
+\begin{python}
+from array import array
+import reprlib
+import math
+import functools
+import operator
+import itertools
+import numbers      # 为了检查类型导入
+
+class Vector:
+    typecode = 'd'
+
+    def __init__(self, components):
+        self._components = array(self.typecode, components)
+
+    def __mul__(self, scalar):
+        if isinstance(scalar, numbers.Real):        # 检查是否是 numbers.Real 的子类实例
+            return Vector(n * scalar for n in self)
+        else:
+            return NotImplemented
+
+    def __rmul__(self, scalar):
+        return self * scalar
+
+    #......
+\end{python}
+
+这样实现后， \texttt{Vector} 实例就可以与各种实数进行乘法运算了。
+
+通过 + 和 * 运算，我们了解了中缀表达式的常用模式，其相关的计数如下表所示：
+
+\begin{table}[H]
+    \centering
+    \caption{中缀运算符方法名}
+    \label{table:中缀运算符方法名}
+    \setlength{\tabcolsep}{2mm}
+    \begin{tabular}{l|llll}
+        \toprule
+        \textbf{运算符} & \textbf{正向方法} & \textbf{反向方法} & \textbf{就地方法} & \textbf{说明} \\
+        \midrule
+        \texttt{+}  & \texttt{\_\_add\_\_} & \texttt{\_\_radd\_\_} & \texttt{\_\_iadd\_\_} & 加法或拼接 \\
+        \texttt{-}  & \texttt{\_\_sub\_\_} & \texttt{\_\_rsub\_\_} & \texttt{\_\_isub\_\_} & 减法\\
+        \texttt{*}  & \texttt{\_\_mul\_\_} & \texttt{\_\_rmul\_\_} & \texttt{\_\_imul\_\_} & 乘法或重复复制\\
+        \texttt{/}  & \texttt{\_\_truediv\_\_} & \texttt{\_\_rtruediv\_\_} & \texttt{\_\_itruediv\_\_} & 除法\\
+        \texttt{//} & \texttt{\_\_floordiv\_\_} & \texttt{\_\_rfloordiv\_\_} & \texttt{\_\_ifloordiv\_\_} & 整除\\
+        \texttt{\%} & \texttt{\_\_mod\_\_} & \texttt{\_\_rmod\_\_} & \texttt{\_\_imod\_\_} & 取余\\
+        \texttt{divmod()} & \texttt{\_\_divmod\_\_} & \texttt{\_\_rdivmod\_\_} & \texttt{\_\_idivmod\_\_} & 商和模组成的元组\\
+        \texttt{**, pow()} & \texttt{\_\_pow\_\_} & \texttt{\_\_rpow\_\_} & \texttt{\_\_ipow\_\_} & 幂运算\\
+        \texttt{@} & \texttt{\_\_matmul\_\_} & \texttt{\_\_rmatmul\_\_} & \texttt{\_\_imatmul\_\_} & 矩阵乘法\\
+        \texttt{\&} & \texttt{\_\_and\_\_} & \texttt{\_\_rand\_\_} & \texttt{\_\_iand\_\_} & 位与\\
+        \texttt{|} & \texttt{\_\_or\_\_} & \texttt{\_\_ror\_\_} & \texttt{\_\_ior\_\_} & 位或\\
+        \texttt{\^} & \texttt{\_\_xor\_\_} & \texttt{\_\_rxor\_\_} & \texttt{\_\_ixor\_\_} & 位异或\\
+        \texttt{<<} & \texttt{\_\_lshift\_\_} & \texttt{\_\_rlshift\_\_} & \texttt{\_\_ilshift\_\_} & 按位左移\\
+        \texttt{>>} & \texttt{\_\_rshift\_\_} & \texttt{\_\_rrshift\_\_} & \texttt{\_\_irshift\_\_} & 按位右移\\
+        \bottomrule
+    \end{tabular}
+
+\end{table}
+
+\subsection{众多比较运算符}
+
+Python 解释器对众多比较运算符的处理与前文类似，不过在两个方面又重大区别：
+
+\begin{itemize}
+    \item 正向和反向调用使用的是同一系列方法。
+    \item 对 \texttt{==} 和 \texttt{!=} 来说，如果反向调用失败，Python 会比较对象的 ID，而不是抛出 \texttt{TypeError}。
+\end{itemize}
+
+\begin{table}[H]
+    \centering
+    \caption{比较运算符方法名}
+    \label{table:比较运算符方法名}
+    \setlength{\tabcolsep}{4mm}
+    \begin{tabular}{c|c|ccc}
+        \toprule
+        \textbf{分组} & \textbf{运算符} & \textbf{正向方法调用} & \textbf{反向方法调用} & \textbf{后备机制} \\
+        \midrule
+        相等性 & \texttt{a==b} & \texttt{a.\_\_eq\_\_(b)} & \texttt{b.\_\_eq\_\_(a)} & 返回 \texttt{id(a) == id(b)} \\
+         & \texttt{a!=b} & \texttt{a.\_\_ne\_\_(b)} & \texttt{b.\_\_ne\_\_(a)} & 返回 \texttt{not(a == b)}\\
+        \midrule
+        排序 & \texttt{a>b} & \texttt{a.\_\_gt\_\_(b)} & \texttt{b.\_\_lt\_\_(a)} & 抛出 TypeError\\
+         & \texttt{a<b} & \texttt{a.\_\_lt\_\_(b)} & \texttt{b.\_\_gt\_\_(a)} & 抛出 TypeError\\
+         & \texttt{a>=b} & \texttt{a.\_\_ge\_\_(b)} & \texttt{b.\_\_le\_\_(a)} & 抛出 TypeError\\
+         & \texttt{a<=b} & \texttt{a.\_\_le\_\_(b)} & \texttt{b.\_\_ge\_\_(a)} & 抛出 TypeError\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+之前我们是这样实现 \texttt{Vector.\_\_eq\_\_} 方法的：
+\begin{python}
+def __eq__(self, other):
+    return (len(self) == len(other) and all(a == b for a,b in zip(self, other)))
+\end{python}
+
+这样做会有一个缺陷：会导致 \texttt{Vector} 实例能与所有的可迭代对象进行比较，究竟是否要这样做，要视情况二定。但对操作数过度宽容会可能导致令人惊讶的结果，而程序员讨厌惊喜。
+
+因此我们应该更保守一点：
+\begin{python}
+def __eq__(self, other):
+    if isinstance(other, self):     # 如果是 Vector 或者其子类实例
+        return (len(self) == len(other) and all(for a,b in zip(self, other)))
+    else:
+        return NotImplemented       # 如果不是，交给反向比较判断
+\end{python}
+
+值得说明的是，我们一般不需要自定义 \texttt{!=} 于是暖，因为从 \texttt{object} 继承的 \texttt{\_\_ne\_\_} 方法后备行为满足了我们的需求：定义了 \texttt{\_\_eq\_\_} 方法，而且它不返回 \texttt{NotImplemented}，\texttt{\_\_ne\_\_} 方法会对 \texttt{\_\_eq\_\_} 方法返回的结果取反。当然如果对某些特定运算，需要用户自己实现两种方法，而不是简单取反。
+
+\subsection{增量运算符}
+
+在外面实现 \texttt{+,*} 运算后， \texttt{Vector} 类已经支持增量运算符 \texttt{+=,*=} 了:
+
+\begin{python}
+>>> v1 = Vector([1,2,3])
+>>> v1_alias = v1           # 复制一份，后面审查啊
+>>> id(v1)
+4302860128
+>>> v1 += Vector([4,5,6])
+>>> v1                      # 增量加法运算，结果与预期相符
+Vector([5.0,7.0,9.0])
+>>> id(v1)                  # id 发生了变化，创建了新实例
+4302859904
+>>> v1_alias                # 原来的 Vector 没有变
+Vector([1.0,2.0,3.0])
+>>> v1*=11
+>>> v1                      # 增量乘法运算，结果与预期相符
+Vector([55.0,77.0,99.0])
+>>> id(v1)                  # 创建了新实例
+4302858336
+\end{python}
+
+如果一个类没有实现就地运算，增量赋值运算符只是语法糖: \texttt{a+=b} 的作用与 \texttt{a=a+b} 完全一样。对不可变类型来说，这是预期行为，而且，如果定义了 \texttt{\_\_add\_\_} 方法，就没有必要写格外的代码。
+
+然而，如果实现了就地运算方法，计算的结果会调用对应方法。这种运算符的名称表明，它们会就地修改左操作数，而不会创建新的对象作为结果。对于不可变了类型，一定不能实现就地运算。
+
+如果是可迭代对象，往往需要实现 \texttt{\_\_iadd\_\_} 这类的方法。并且，通过观察 \texttt{list} 方法的实现，我们可以知道，与 \texttt{+} 相比， \texttt{+=} 运算符对第二个操作数更宽容。 \texttt{+} 运算符的两个操作数必须是相同类型，如若不然，结果的类型可能让人摸不着头脑。而 \texttt{+=} 的情况更明确，因为就地修改左操作数，所以结果的类型是确定的。
+
+下面我们使用 \texttt{BingoCage} 的子类，演示 \texttt{+=} 运算符的实现：
+
+\begin{python}
+class AddableBingoCage(BingoCage):
+
+    def __add__(self, other):
+        if isinstance(self, Tombola):   # 第二个操作数只能是 Tombola 及其子类
+            return AddableBingoCage(self.inspect() + other.inspect())
+        else:
+            return NotImplemented
+
+    def __iadd__(self, other):
+        if isinstance(other, Tombola):
+            other_iterable = other.inspect()
+        else:
+            try:
+                other_iterable = iter(other)    # iter 将在下一章讨论
+            except TypeError:                   # 若失败，告诉用户该怎么做
+                self_cls = type(self).__name__
+                msg = "right operand in += must be {!r} or an iterable"
+                raise TypeError(msg.format(self_cls))
+        self.load(other_iterable)   # 如果能执行到这里，载入
+        return self     # 增量赋值必须返回 self
+\end{python}
+
+此外，我们也无需实现 \texttt{\_\_radd\_\_} 方法，因为不需要。如果右操作数是相同类型，那么正向方法 \texttt{\_\_add\_\_} 会处理。
+
+\newpage

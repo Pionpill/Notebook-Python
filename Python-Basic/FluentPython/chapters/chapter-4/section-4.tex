@@ -1,0 +1,503 @@
+\section{接口：从协议到抽象基类}
+\subsection{Python 文化中的接口和协议}
+
+在引入抽象基类之前，Python 就已经非常成功了，即使是现在也很少有代码使用抽象基类。
+
+Python 没有 \texttt{interface} 关键字，而且除了抽象基类，每个类都有接口：类实现或继承的公开属性(方法或数据属性)，包括特殊方法，如 \texttt{\_\_getitem\_\_} 或 \texttt{\_\_add\_\_} 。
+
+按照定义，受保护的属性和私有属性不在接口中：即便 ``受保护的'' 属性只是采取命名约定实现的；私有属性可以轻松地访问，原因也是如此。不要违背这些约定。
+
+另一方面，不要觉得把公开数据属性放入对象的接口中不妥，因为如果需要，总能实现读值方法和设值方法，把数据属性变成特性，使用 \texttt{obj.attr} 句法的客户代码不会受到影响。 \texttt{Vector2d} 类就是这么做的。
+
+\begin{python}
+class Vector2d:
+    typecode = 'd'
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __iter__(self):
+        return (i for i in (self.x, self.y))
+\end{python}
+
+在上述示例中，我们把 \texttt{x} 和 \texttt{y} 变成了只读属性。这是一项重大重构，但是 \texttt{Vector2d} 的接口基本没变：用户仍能读取 \texttt{my\_vector.x} 和 \texttt{my\_vector.y}。
+
+关于接口还有个实用的补充定义：对象公开方法的子集，让对象在系统中扮演特定的角色。Python 文档中的 ``文件类对象'' 或 ``可迭代对象'' 就是这个意思，这种说法指的不是特定的类。接口是实现特定角色的方法的集合，这样理解正是 Smalltalk 程序员所说的协议，其他动态语言社区都借鉴了这个术语。协议与继承没有关系。一个类可以实现多个协议，从而让实例扮演多个角色。
+
+协议是接口，但不是正式的(只由文档和约定定义)，因此协议不能像正式接口那样施加限制。一个类可能只实现部分接口，这是允许的。有时，某些 API 只要求 ``文件类对象'' 返回字节序列的 \texttt{.read()} 方法。在特定的上下文中可能需要其他文件操作方法，也可能不需要。
+
+对 Python 程序员来说，``X 类对象'' ``X协议'' 和 ``X接口'' 是一个意思。
+
+\subsection{Python 喜欢序列}
+
+序列协议是 Python 最基础的协议之一。即便对象只实现了那个协议最基本的一部分，解释器也会负责任地处理。
+
+下图展示了定义为抽象基类的 \texttt{Sequence} 正式接口。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (container) at (0,4) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Container} \\
+                \midrule
+                \textit{\_\_contains\_\_ } 
+            \end{tabular}
+        };
+
+        \node (iterable) at (0,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Iterable} \\
+                \midrule
+                \textit{\_\_iter\_\_}
+            \end{tabular}
+        };
+
+        \node (sized) at (0,0) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Sized} \\
+                \midrule
+                \textit{\_\_len\_\_}
+            \end{tabular}
+        };
+
+        \node (sequence) at (6,2) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Sequence} \\
+                \midrule
+                \textit{\_\_getitem\_\_} \\
+                \_\_contains\_\_ \\
+                \_\_iter\_\_ \\ 
+                \_\_reversed\_\_ \\
+                index \\
+                count
+            \end{tabular}
+        };
+
+        \begin{scope}
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (sequence) -- (container);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (sequence) -- (iterable);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (sequence) -- (sized);
+        \end{scope}
+    \end{tikzpicture}
+    \caption{Sequence 抽象基类}
+    \label{Sequence 抽象基类}
+\end{figure}
+
+现在看一个示例 \texttt{Foo} 类，它没有继承 \texttt{abc.Sequence}，而且只实现了序列协议的一个方法 \texttt{\_\_getitem\_\_} (没有实现 \texttt{\_\_len\_\_} 方法)。
+
+\begin{python}
+>>> class Foo:
+...     def __getitem__(self, pos):
+...         return range(0, 30, 10)[pos]
+... 
+>>> f = Foo()
+>>> f[1]
+10
+>>> for i in f: print(i)
+0
+10
+20
+>>> 15 in f
+False
+\end{python}
+
+虽然没有 \texttt{\_\_iter\_\_} 方法，但是 \texttt{Foo} 实例是可迭代对象，因为发现有 \texttt{\_\_getitem\_\_} 方法时，Python 会调用它，传入从 0 开始的整数所有，尝试迭代对象(这是一种后备机制)。尽管没有实现  \texttt{\_\_contains\_\_} 方法，但是 Python 足够智能，能迭代 \texttt{Foo} 实例，因此也能使用 \texttt{in} 运算符：Python 会做全面检查，看看有没有指定的元素。
+
+综上，鉴于序列协议的重要性，如果没有 \texttt{\_\_iter\_\_} 和 \texttt{\_\_contains\_\_} 方法，Python 会调用 \texttt{\_\_getitem\_\_} 方法，设法让迭代和 \texttt{in} 运算符可用。
+
+第1章定义的 \texttt{FrenchDeck} 类也没有继承 abc.Sequence，但是实现了序列协议的两个方法：\texttt{\_\_getitem\_\_} 和 \texttt{\_\_len\_\_}。
+
+\lstinputlisting[language=Python]{../../Scripts/Introduction/1-1.py}
+
+第1章那些示例之所以能用，大部分是由于 Python 会特殊对待那些看起来像是序列的对象。Python 中的迭代是鸭子类型的一种极端形式：为了迭代对象，解释器会尝试调用两个不同的方法。
+
+\subsection{使用猴子补丁在运行时实现协议}
+
+例1-1有个重大缺陷：无法洗牌。作者第一次编写 \texttt{FrenchDeck} 示例时，实现了 \texttt{shuffle} 方法。后来，作者对 Python 风格有了更深刻的理解，发现如果 \texttt{FrenchDeck} 实例的行为像序列，那么他就不需要 \texttt{shuffle} 方法，因为已经有了 \texttt{random.shuffle} 函数可用。
+
+标准库中的 \texttt{random.shuffle} 用法如下：
+
+\begin{python}
+>>> from random import shuffle
+>>> l = list(range(10))
+>>> shuffle(l)
+[4, 7, 5, 3, 8, 9, 6, 1, 0, 2]
+\end{python}
+
+然而，如果尝试打乱 \texttt{FrenchDeck} 实例，则会出现异常："'FrenchDeck' object does not support item assignment"。这个问题的原因是， \texttt{shuffle} 函数要调换集合中元素的位置，而 FrenchDeck 只实现了不可变的序列协议。可变的序列还必须提供 \\texttt{\_\_setitem\_\_} 方法。
+
+Python 是动态语言，因此我们可以在运行时修正这个问题，甚至还可以在交互式控制台中，修正方法如下：
+
+\begin{python}
+>>> def set_card(deck, position, card):
+...     deck._cards[position] = card 
+... 
+>>> FrenchDeck.__setitem__ = set_card 
+>>> shuffle(deck)
+\end{python}
+
+特殊方法 \texttt{\_\_setitem\_\_} 的签名在 Python 语言参考手册中定义，语言参考中使用的参数是 \texttt{self,key,value}。这里使用的是 d\texttt{eck, position, card}。这么做是为了告诉你，每个 Python 方法说到底都是普通函数，把第一个参数命名为 \texttt{self} 只是一定约定。在控制台中使用那几个参数没有问题，不过在 Python 源码文件中最好按约定使用 \texttt{self,key,value}。
+
+这里的关键是， \texttt{set\_card} 函数要知道 \texttt{deck} 对象有一个名为 \texttt{\_cards} 的值必须是可变序列，然后，我们把 \texttt{set\_card} 函数赋值给特殊方法 \texttt{\_\_setitem\_\_}，从而把它依附到 \texttt{FrenchDeck} 类上。这种技术叫猴子补丁：在运行时修改类或模块，而不该动源代码。猴子补丁很强大，但是打补丁的代码与要打补丁的程序耦合十分紧密，而且往往要处理隐藏和没有文档的部分。
+
+处理举例说明猴子补丁之外，上述示例还强调了协议是动态的： \texttt{random.shuffle} 函数不关心参数的类型，只要那个对象是西安了部分可变序列协议即可。即便对象一开始没有所需的方法也没关系，后来再提供也行。
+
+\subsection{Alex Martelli 的水禽}
+
+这节多为介绍性内容，这里省略了很多，请参考原文第 262 页。
+
+继承抽象基类很简单，只需要实现所需的方法，这样也能明确开发者的意图。此外，使用 \texttt{isinstance} 和 \texttt{issubclass} 测试抽象基类更为人接受。
+
+然而，即便是抽象基类，也不能滥用 \texttt{isinstance} 检查，用的多了可能导致代码异味，即表明面向对象设计得不好。在一连串 \texttt{if/elif/elif} 中使用 \texttt{isinstance} 做检查，然后根据对象的类型执行不同的操作，通常是不好的做法；此时应该使用多态，即采用一定的方式定义类，让解释器把调用分派给正确的方法。
+
+另一方面，如果必须强制执行 API 契约，通常可以使用 \texttt{isinstace} 检查抽象基类。
+
+Alex 多次强调，要抑制住创建抽象基类的冲动。滥用抽象基类会造成灾难性的后果，表明语言太注意表面形式，这对以实用和务实著称的 Python 可不是好事。
+
+\subsection{定义抽象基类的子类}
+
+我们将遵循 Martelli 的建议，先利用现有的抽象基类然后再斗胆自己定义。下面我们将 \texttt{FrenchDeck2} 声明为 \texttt{collections.MutableSequence} 的子类。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/11-8.py}
+
+导入模块时，Python 不会检查抽象方法的实现，在运行时实例化 \texttt{FrenchDeck2} 类时才会真正检查。因此，如果没有正确实现某个抽象方法，Python 会抛出 \texttt{TypeError} 异常，并把错误消息设置为 ``Can't instantiate abstract class FrenchDeck2 with abstract method \_\_delitem()\_\_, insert'' 正是这个原因，即便 \texttt{FrenchDeck2} 类不需要 \texttt{\_\_delitem\_\_} 和 \texttt{insert} 提供的形为，也要实现，因为 \texttt{MutableSequence} 抽象基类需要它们。
+
+在 \texttt{collections.abc} 中，每个抽象基类的具体方法都是作为类的公开接口实现的，因此不用知道实例的内部结构。
+
+\subsection{标准库中的抽象基类}
+
+自 Python2.6 开始，在标准库中提供了抽象基类，其中大部分抽象基类在 \texttt{collections.abc} 模块中。
+
+\subsubsection{\texttt{collections.abc} 模块中的抽象基类}
+
+标准库中有两个名为 \texttt{abc} 的模块，这里说的是 \texttt{collections.abc}。为了减少加载时间，Python3.4 在 \texttt{collections} 包之外实现了这个模块，因此要与 \texttt{collections} 模块分开导入。另一个 \texttt{abc} 模块就是 \texttt{abc} ，这里定义的是 \texttt{abc.ABC} 类，每个抽象基类都依赖于这个类，但是不用导入它，除非定义新抽象基类。
+ 
+Python3.4 在 \texttt{collections.abc} 模块中定义了 16 个抽象基类，其继承关系如下图。
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[draw, font=\small, thick]
+        \begin{scope}
+            \node[draw] (Iterable) at (0,0) {Iterable};
+            \node[draw] (Container) at (2.5,0) {Container};
+            \node[draw] (Sized) at (5,0) {Sized};
+            \node[draw] (Callable) at (7.5,0) {Callable};
+            \node[draw] (Hashable) at (10,0) {Hashable};   
+        \end{scope}
+        \begin{scope}[yshift = -2.5cm]
+            \node[draw] (Iterator) at (-1,1) {Iterator};
+            \node[draw] (Sequence) at (1,0) {Sequence};
+            \node[draw] (Mapping) at (3.5,0) {Mapping};
+            \node[draw] (Set) at (6,0) {Set};
+            \node[draw] (MappingView) at (8.5,0) {MappingView};
+        \end{scope}
+        \begin{scope}[yshift = -4.5cm]
+            \node[draw] (MutableSequence) at (-1,0) {MutableSequence};
+            \node[draw] (MutableMapping) at (3,0) {MutableMapping};
+            \node[draw] (MutableSet) at (5,-1) {MutableSet};
+            \node[draw] (ItemsView) at (7.5,-1) {ItemsView};
+            \node[draw] (KeysView) at (10,-1) {KeysView};
+            \node[draw] (ValuesView) at (11.5,0) {ValuesView};
+        \end{scope}
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Iterator) -- (Iterable);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Sequence) -- (Iterable);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Mapping) -- (Iterable);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Set) -- (Iterable);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Sequence) -- (Container);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Mapping) -- (Container);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Set) -- (Container);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Sequence) -- (Sized);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Mapping) -- (Sized);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (Set) -- (Sized);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (MappingView) -- (Sized);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (MutableSequence) -- (Sequence);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (MutableMapping) -- (Mapping);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (MutableSet) -- (Set);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (ItemsView) -- (Set);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (KeysView) -- (Set);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (ItemsView) -- (MappingView);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (KeysView) -- (MappingView);
+        \draw [thick,-{Latex[round,open,length=0.4cm]}] (ValuesView) -- (MappingView);
+    \end{tikzpicture}
+    \caption{collections.abc 抽象基类继承关系}
+    \label{fig:collections.abc 抽象基类继承关系}
+\end{figure}
+
+下面详述这些基类：
+\begin{itemize}
+    \item \texttt{Iterable，Container，Sized} 
+    
+    各个集合应该继承自这三个抽象基类，或者至少实现兼容的协议。
+    \begin{itemize}
+        \item \texttt{Iterable} 通过 \texttt{\_\_iter\_\_} 方法支持迭代。
+        \item \texttt{Container} 通过 \texttt{\_\_contains\_\_} 方法支持 \texttt{in} 运算符。
+        \item \texttt{Sized} 通过 \texttt{\_\_len\_\_} 方法支持 \texttt{len()} 函数。
+    \end{itemize}
+
+    \item \texttt{Sequence，Mapping，Set} 
+    
+    这三个是主要的不可变集合类型，而且各自都有可变的子类。
+
+    \item \texttt{MappingView} 
+    
+    在 Python3 中，映射方法 \texttt{.items()}, \texttt{.keys()}, \texttt{.values()} 返回的对象分别是 \texttt{ItemsView}, \texttt{KeysView}, \texttt{ValuesView} 的实例。前两个类还从 \textrm{Set} 类继承了丰富的接口。
+
+    \item \texttt{Callable, Hashable} 
+    
+    这两个抽象基类与集合没有太大关系，只不过因为 \texttt{collections.abc} 是标准库中定义抽象基类的第一个模块，而它们又太重要了，因此才把它们放在了 \texttt{collections.abc} 模块中。原作者从未见过 \texttt{Callable, Hashable} 的子类。这两个抽象基类的主要作用是为内置函数 \texttt{isinstance} 提供支持，以一种安全的方式判断对象能不能调用或散列。若想检查是否能调用，可以使用内置的 \texttt{callable()} 函数，但是没有类似的 \texttt{hashable()} 函数，因此测试对象是否可散列，最好使用 \texttt{isinstance(my\_obj,Hashable)}。
+
+    \item \texttt{Iterator} 
+    
+    注意它是 \texttt{Iterable} 的子类，会在后文中详细讨论。
+\end{itemize}
+
+\subsubsection{抽象基类的数字塔}
+
+\texttt{numbers} 包定义的是 ``数字塔''(即各个抽象基类的层次结构是线性的)，其中 \texttt{Number} 是位于最顶端的超类，随后是 \texttt{Complex} 子类，依次往下，最底端的是 \texttt{Integral} 类\footnote{包括 \texttt{Number, Complex, Real, Rational, Integral}}。
+
+因此，如果想检查一个数是不是整数，可以使用 \texttt{isinstance(x, numbers.Integral)} ，这样代码就能接受 \texttt{int, bool}，或者外部库使用 \texttt{numbers} 抽象基类注册的其他类型。
+
+与之类似，如果一个值可能是浮点数类型，可以使用 \texttt{isinstance(x, numbers.Real)} 检查。这样代码就能接受 \texttt{bool, int, float, fraction.Fraction} 或者外部库提供的非复数类型。
+
+\subsection{定义并使用一个抽象基类}
+
+假设我们在构建一个广告管理框架，名为 ADAM。它的职责之一是，支持用户提供随机挑选的无重复类。为了让 ADAM 的用户明确理解 ``随机挑选的无重复'' 组件是什么意思，我们将定义一个抽象基类。
+
+我们将这个抽象基类命名为 \texttt{Tombola}，它有四个方法，其中两个是抽象方法：
+\begin{itemize}
+    \item \texttt{.load(...)}: 把元素放入容器。
+    \item \texttt{.pick()}: 从容器中随机拿出一个元素，返回选中的元素。
+\end{itemize}
+另外两个是具体方法：
+\begin{itemize}
+    \item \texttt{.loaded()}: 如果容器中至少有一个元素，返回 \texttt{True}。
+    \item \texttt{.inspect()}: 返回一个有序元组，由容器中的现有元素构成，不会修改容器的内容(内部顺序不保留)。
+\end{itemize}
+
+下图展示了 Tombola 抽象基类和三个具体实现：
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (Tombola) at (0,0) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{Tombola} \\
+                \midrule
+                \textit{load} \\
+                \textit{pick} \\
+                loaded \\
+                inspect \\
+            \end{tabular}
+        };
+
+        \node (BingoCage) at (-5,-5) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{BingoCage} \\
+                \midrule
+                \_\_init\_\_ \\
+                load \\
+                pick \\
+                \_\_call\_\_ \\
+            \end{tabular}
+        };
+
+        \node (LotteryBlower) at (0,-5) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{LotteryBlower} \\
+                \midrule
+                \_\_init\_\_ \\
+                load \\
+                pick \\
+                loaded \\
+                inspect \\
+            \end{tabular}
+        };
+
+        \node (TomboList) at (5,-5) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{TomboList} \\
+                \midrule
+                load \\
+                pick \\
+                loaded \\
+                inspect \\
+            \end{tabular}
+        };
+
+        \begin{scope}
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (BingoCage) -- (Tombola);
+            \draw [thick,-{Latex[round,open,length=0.5cm]}] (LotteryBlower) -- (Tombola);
+            \draw [thick,dashed,-{Latex[round,open,length=0.5cm]}] (TomboList) -- (Tombola) node [pos=0.5, right, font=\footnotesize] {<<registered>>};
+        \end{scope}
+    \end{tikzpicture}
+    \caption{Tombola 继承关系}
+    \label{Tombola 继承关系}
+\end{figure}
+
+Tombola 抽象基类的定义如下：
+
+\lstinputlisting[language=Python]{../../Scripts/Class/11-9.py}
+
+抽象基类可以有实现方法，但即便实现了，子类也必须覆盖抽象方法，但是在子类中可以使用 \texttt{super()} 函数调用抽象方法，为它添加功能，而不是从头开始实现。
+
+在上述实例中， \texttt{.inspect()} 方法有点笨拙，这只是为了强调抽象基类可以提供具体方法，只要依赖接口中的其他方法就行。
+
+\subsubsection{抽象基类句法详解}
+
+声明抽象基类最简单的方式是继承 \texttt{abc.ABC} 或其他抽象基类。然而， \texttt{abc.ABC} 是 Python3.4 新增的类，因此如果使用旧版的 Python 并且不能继承现有的抽象基类，必须在 \texttt{class} 语句中使用 metaclass = 关键字，把值设为 \texttt{abc.ABCMeta}：
+
+\begin{python}
+    class Tombola(metaclass = abc.ABCMeta):
+    # ...
+\end{python}
+
+如果实在更遥远的 Python2 版本，则需要使用 \texttt{\_\_metaclass\_\_} 类\footnote{元类会在后面章节讲解}属性。
+
+\begin{python}
+    class Tombola(object):
+    __metaclass__ = abc.ABCMeta
+    # ...
+\end{python}
+
+除了 \texttt{@abstractmethod} 之外， \texttt{abc} 模块还定义了 \texttt{@abstractclassmethod}, \texttt{@abstractstaticmethod}, \texttt{@abstractproperty} 三个修饰器，但这三个装饰器在 Python3.3 起废弃了，因为装饰器可以在 \texttt{@abstractmethod} 上堆叠，这三个就显得多余了。例如，声明抽象类方法的推荐方式是：
+
+\begin{python}
+    class MyABC(abc.ABC):
+    @classmethod
+    @abc.abstractmethod
+    def an_abstract_method(cls,...):
+    pass
+\end{python}
+
+\subsubsection{定义 \texttt{Tombola} 抽象基类的子类}
+
+下面我们来定义 Tombola 的抽象子类：BingoCage。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/11-12.py}
+
+下面我们再定义一个抽象子类：\texttt{LotteryBlower}，它对两个耗时的 \texttt{loaded} 和 \texttt{inspect} 方法进行了重写。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/11-13.py}
+
+\subsubsection{\texttt{Tombola} 的虚拟子类} 
+
+白鹅类型的一个基本特征：即便不继承，也有办法把一个类注册为抽象基类的虚拟子类。这样做时，我们保证注册的类忠实地实现了抽象基类定义的接口，而 Python 会相信我们，从而不做检查。如果我们说谎了，常规的运行时异常会被我们捕获。
+
+注册虚拟子类的方式是再抽象基类上调用 register 方法。这么做之后，注册的类会变成抽象基类的虚拟子类，而且 issubclass 和 isinstance 等函数都能识别，但是注册的类不会从抽象基类中继承任何方法或属性。
+
+虚拟子类不会继承注册的抽象基类，而且任何时候都不会检查它是否符合抽象基类的接口，即便再实例化时也不会检查。为了避免运行时粗偶，虚拟子类要实现所需的全部方法。
+
+\texttt{register} 方法通常作为普通的函数调用，不过也可以作为装饰器使用。下面我们将实现 \texttt{TomboList} 类，其继承关系如下图：
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[scale = 1]
+        \node (MutableSequence) at (0,0.5) [draw,font=\small,thick] {\textbf{MutableSequence}};
+        \node (Tombola) at (5,-3) [draw,font=\small,thick] {\textbf{Tombola}};
+
+        \node (list) at (0,-3) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{list} \\
+                \midrule
+                \_\_init\_\_ \\
+                \_\_len\_\_ \\
+                extend \\
+                \_\_bool\_\_ \\
+                ...
+            \end{tabular}
+        };
+
+        \node (TomboList) at (2,-7.5) [minimum width=3cm,draw,font=\small,thick] {
+            \begin{tabular}{c}
+                \textbf{TomboList} \\
+                \midrule
+                pick \\
+                load \\
+                loaded \\
+                inspect
+            \end{tabular}
+        };
+
+        \draw [dashed, thick, -{Latex[round,open,length=0.4cm]}] (list) -- (MutableSequence) node [pos=0.5, right, font = \footnotesize] {<<registered>>};
+        \draw [thick, -{Latex[round,open,length=0.4cm]}] (TomboList) -- (list);
+        \draw [dashed, thick, -{Latex[round,open,length=0.4cm]}] (TomboList) -- (Tombola) node [pos=0.5, right, font = \footnotesize] {<<registered>>};
+    \end{tikzpicture}
+    \caption{TomboList 继承关系}
+    \label{fig:TomboList 继承关系}
+\end{figure}
+
+下面我们将使用装饰器语法实现 \texttt{TomboList} 类：
+
+\lstinputlisting[language=Python]{../../Scripts/Class/11-14.py}
+
+注册之后，可以使用 \texttt{issubclass} 和 \texttt{isinstance} 函数判断 \texttt{TomboList} 是不是 \texttt{Tombola} 的子类：
+
+\begin{python}
+>>> issubclass(TomboList, Tombola)
+True
+>>> t = TomboList(range(100))
+>>> isinstance(t, Tombola)
+True
+\end{python}
+
+类的继承关系在一个特殊的类属性中指定 \texttt{\_\_mro\_\_}，即方法解析顺序。这个属性的作用很简单，按顺序列出类及其超类，Python 会按照这个顺序搜索方法。查看 \texttt{TomboList} 类的 \texttt{\_\_mro\_\_} 属性，你会发现它只列出了 ``真实的'' 超类，即 \texttt{list} 和 \texttt{object}。
+
+\begin{python}
+>>> TomboList.__mro__
+(<class 'tombolist.TomboList'>, <class 'list'>, <class 'object'>)
+\end{python}
+
+\texttt{TomboList.\_\_mro\_\_} 中没有 \texttt{Tombola}，因此 \texttt{TomboList} 没有从 \texttt{Tombola} 中继承任何方法。
+
+\subsection{\texttt{Tombola} 子类的测试方法}
+
+下面介绍两个用于测试的方法：
+\begin{itemize}
+    \item \texttt{\_\_subclass\_\_()} 
+    
+    这个方法返回类的直接子类列表，不含虚拟子类。
+
+    \item \texttt{\_abc\_registry}
+    
+    只有抽象基类有这个数据属性，其值是一个 \texttt{WeakSet} 对象，即抽象类注册的虚拟子类的弱引用。
+\end{itemize}
+
+测试脚本过长，这里不给出，读者可自行查阅原文 P278 页。
+
+\subsection{Python 使用 \texttt{register} 的方法}
+
+示例 11-14 将 Tombola.register 当作类装饰器使用。但在 Python3.3 之气的版本中不能这样使用，必须再定义类后像普通函数那样调用。
+
+虽然现在可以把 \texttt{register} 当作装饰器使用，但更常见的做法还是当作函数使用，用于注册其他地方定义的类。例如 \texttt{Sequence}：
+
+\begin{python}
+Sequence.register(tuple)
+Sequence.register(str)
+Sequence.register(range)
+Sequence.register(memory)
+\end{python}
+
+\subsection{鹅的行为有可能像鸭子}
+
+即便不注册，抽象基类也能把一个类识别为虚拟子类。
+
+\begin{python}
+>>> class Struggle:
+...     def __len__(self): return 23
+...
+>>> from collections import abc
+>>> isinstance(Struggle(), abc.Sized)
+True
+>>> issubclass(Struggle, abb,Sized)
+True
+\end{python}
+
+可以发现， \texttt{Struggle} 没有继承自 \texttt{abc.Sized} 但却是它的子类，这是因为 \texttt{abc.Sized} 实现了一个特殊的类方法，名为 \texttt{\_\_subclasshook\_\_}。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/11-17.py}
+
+原作者并不建议程序员自己实现 \texttt{\_\_subclasshook\_\_} 方法，原因是可靠性很低。
+
+\newpage

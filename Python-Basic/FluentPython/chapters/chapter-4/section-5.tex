@@ -1,0 +1,107 @@
+\section{继承的优缺点}
+\subsection{子类化内置类型很麻烦}
+
+Python 允许内置类型子类化，但有个重要的注意事项：内置类型不会调用用户定义的类覆盖的特殊方法。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/12-1.py}
+
+在上述代码中，只有直接调用 \texttt{\_\_setitem\_\_} 的 \texttt{dd['two'] = 2} 代码返回了我们所期望的指。而其他间接调用 \texttt{\_\_setitem\_\_} 的方法都忽略了我们覆盖的 \texttt{\_\_setitem\_\_} 方法。不仅如此，内置类型的方法调用的其他类方法，如果被覆盖了，也不会被调用。
+
+原生类型的这种行为违背了面向对象编程的一个基本原则：始终应该从实例 (\texttt{self}) 所属的类开始搜索方法，即使在超类实现的类中调用也是如此。在这种糟糕的局面中， \texttt{\_\_missing\_\_} 方法却能按预期方法工作，不过这只是特例。
+
+直接子类化内置类型容易出错，因为内置类型的方法通常会忽略用户覆盖的方法。用户自定义的类应该继承自 \texttt{collections} 模块中的类，这些类做了特殊设计，因此易于扩展。
+
+下面是一个继承自 \texttt{collections.UserDict} 的例子：
+
+\lstinputlisting[language=Python]{../../Scripts/Class/12-3.py}
+
+\subsection{多重继承和方法解析顺序}
+
+任何实现多重继承的语句都要处理潜在的命名冲突，这种冲突由不相关的祖先类实现同名方法引起。我们看下面这个例子。
+
+\lstinputlisting[language=Python]{../../Scripts/Class/12-4.py}
+
+下面我们在 \texttt{D} 的实例上调用 \texttt{d.pong()} 方法：
+
+\begin{python}
+>>> d = D()
+>>> d.pong()    # 直接调用 pong 运行的是第一个继承的 B 版本。
+pong:<diamond.D object at 0x......>
+>>> C.pong(d)   # 超类中的方法都可以直接调用，此时要把实例作为显式参数传入。
+PONG:<diamond.D object at 0x......>
+\end{python}
+
+Python 能区分 \texttt{d.pong()} 调用的是哪个方法，是因为 Python 会按照特定的顺序遍历继承图。这个顺序叫方法解析顺序。类都有一个名为 \texttt{\_\_mro\_\_} 的属性，它的值是一个元组，按照方法解析顺序列出各个超类，从当前类一直向上，直到 \texttt{object} 类。D 类的 \texttt{\_\_mro\_\_} 属性如下：
+
+\begin{python}
+>>> D.__mro__
+(<class 'diamond.D'>, <class 'diamond.B'>, <class 'diamond.C'>, <class 'diamond.A'>, <class 'object'>)
+\end{python}
+
+若想把方法调用委托给超类，推荐的方式是使用内置的 \texttt{super()} 函数。有时可能要绕过方法解析顺序，直接调用某个超类的方法，这样做有时更方便。例如 \texttt{D.ping} 方法可以这样写：
+
+\begin{python}
+def ping(self):
+    A.ping(self)    # 不是 super().ping()
+    print('posy-ping:', self)
+\end{python}
+
+注意，直接在类上调用实例方法时，必须显式传入 \texttt{self} 参数，因为这样访问的是未绑定方法。但是最好还是使用 \texttt{super()} 方法，这样既安全，又不易过时。尤其是在调用框架或不受自己控制的类层次结构时。
+
+下面来看在 \texttt{D} 上调用 \texttt{pingpong} 方法得到的结果。
+
+\begin{python}
+>>> d = D()
+>>> d.pingpong()
+post-ping: <__main__.D object at 0x00000207D6E80148>    
+ping: <__main__.D object at 0x00000207D6E80148>     # 调用超类 A 中的 ping() 方法
+pong: <__main__.D object at 0x00000207D6E80148>     # 自己没有，向上找到 B 的 pong() 方法
+pong: <__main__.D object at 0x00000207D6E80148>     # 向上找到 B 的 pong() 方法
+PONG: <__main__.D object at 0x00000207D6E80148>     # 忽略 __mro__，直接调用 C 中的 pong() 方法
+\end{python}
+
+方法解析顺序不仅考虑继承图，还考虑子类声明中列出超类的顺序。也就是说 \texttt{class D(B, C)} 会先搜索 B 再搜索 C。在内部实现中，方法解析顺序使用 C3 算法，不过除非大量使用复杂的多继承，否则无需了解。
+
+\subsection{处理多重继承}
+
+在日常使用中，虽然多继承没有缺陷，但是应该尽量避免使用多继承。多继承会增加复杂度，往往会导致难以理解的错误。下面是避免多继承混乱的一些建议。\footnote{这里跳过了原书 12.3 节，这节讲解的是 Tkinter 的多继承实例}
+
+\begin{enumerate}
+    \item \textit{把接口继承可实现继承区分开} 
+    
+    使用多重继承时，一定要明确一开始为什么创建子类：
+    \begin{itemize}
+        \item 继承接口：创建子类时，实现 ``是什么'' 关系。
+        \item 继承实现：通过重用避免代码重复。
+    \end{itemize}
+
+    \item \textit{使用抽象基类显式表示接口} 
+    
+    如果类的作用是定义接口，应该明确把它定义为抽象基类。
+
+    \item \textit{通过混入重用代码} 
+    
+    如果一个类的作用是为了多个不相关的子类提供方法实现，从而实现重用，但不体现 ``是什么'' 关系，应该把那个类明确定义为混入类。从概念上讲，混入不定义新类型，只是打包方法，便于重用。混入类绝对不能实例化，而且具体类不能只继承混入类。混入类应该提供某方面的特定行为，只实现少量关系非常密切的方法。
+
+    \item \textit{在名称中明确指明混入} 
+    
+    Python 并没有把类声明为混入的正规方式，所以强烈建议在名称中加入 \texttt{...Mixin} 后缀表示混入类。在 UML 中使用 \textit{<<mixin>>} 标记。
+
+    \item \textit{抽象基类可以作为混入，反过来则不成立} 
+    
+    抽象基类可以实现具体方法，因此可以作为混入使用。不过，抽象基类会定义类型，而混入做不到。此外，抽象基类可以作为其他类的唯一基类，而混入绝不能作为唯一的超类，除非继承另一个更具体的混入(实际上很少这样用)。
+
+    \item \textit{不要子类化多个基类} 
+    
+    具体类可以没有，或者最多只有一个具体超类。也就是说，具体类的超类中除了这一个具体超类之外，其余的都是抽象基类或混入。
+
+    \item \textit{为用户提供聚合类} 
+    
+    如果抽象基类或混入的组合对客户代码非常有用，那就提供一个类，使用易于理解的方式把它们结合起来。
+
+    \item \textit{优先使用对象组合，而不是类继承} 
+    
+    优先使用组合能让设计更灵活。子类化是一种紧耦合，而且较高的继承树容易倒。
+\end{enumerate}
+
+\newpage

@@ -1,0 +1,188 @@
+\section{上下文管理器和 \texttt{else} 块}
+\subsection{\texttt{if} 语句之外的 \texttt{else} 块}
+
+\texttt{else} 子句不仅能在 \texttt{if} 语句中使用，还能在 \texttt{for,while,try} 语句中使用：
+
+\begin{itemize}
+    \item \texttt{for} \\
+    仅当 \texttt{for} 循环运行完毕时(\texttt{for} 循环没有被 \texttt{break} 语句中止)才运行 \texttt{else} 块。
+    \item \texttt{while} \\
+    仅当 \texttt{while} 循环因为条件为假值而退出时(即 \texttt{while} 循环没有被 \texttt{break} 语句中止) 才运行 \texttt{else} 块。
+    \item \texttt{try} \\
+    仅当 \texttt{try} 块中没有异常抛出时才运行 \texttt{else} 块。且 \texttt{else} 子句抛出的异常不会由前面的 \texttt{except} 子句处理。
+\end{itemize}
+
+在所有情况下，如果异常或者 \texttt{return,break,continue} 语句导致控制权跳到了复合语句的主块之外， \texttt{else} 子句也会跳过。
+
+下面会讲解 \texttt{else} 语句的具体案例，但原作者并不推荐在 \texttt{if} 语句之外的地方使用 \texttt{else} 关键字，因为 \texttt{else} 的字面意思具有``排他性''这层意思。但是在 \texttt{if} 语句之外的语句中 \texttt{else} 往往代表着然后，其意义更接近 \texttt{then} ，这会造成很多误解。
+
+在这些语句中使用 \texttt{else} 子句通常能让代码易于理解，而且能省去一些麻烦，不用设置控制标志或者条件额外的 \texttt{if} 语句。
+
+在循环中使用 \texttt{else} 子句的方式如下述代码片段所示：
+
+\begin{python}
+for item in my_list:
+    if item.flavor == 'banana':
+        break
+else:
+    raise ValueError('No banana flavor found!')
+\end{python}
+
+在 \texttt{try/except} 语句中使用 \texttt{else} 如下述代码片段所示：
+\begin{python}
+try:
+    dangerous_call()
+except OSError:
+    log('OSError...')
+else:
+    after_call()
+\end{python}
+ 
+上述代码中 \texttt{try} 防守的是 \texttt{dangerous\_call()} 可能出现的错误，而不是 \texttt{after\_call()}，只有 \texttt{try} 块不抛出异常，才会执行 \texttt{after\_call()}。
+
+在 Python 中， \texttt{try/except} 不仅用于处理错误，还常用于控制流程。为了 Python 官方词汇表还定义了一个缩略词。
+
+\begin{itemize}
+    \item EAFP (easier to ask for forgiveness than permission)
+    
+    获得原谅比获得许可容易。这是一种常见的 Python 编程风格，先假定存在有效的键或属性，如果假定不成立，那么捕获异常。这种风格简单明快，特点是代码中有很多 \texttt{try/except} 语句。与其它语言一样，这种风格的对立面是 LBYL 风格。
+
+    \item LBYL (look before you leap)
+    
+    三思而后行。这种编程风格在调用函数或查找属性或健之前显式测试前提条件。特点是代码中有很多 \texttt{if} 语句。
+\end{itemize}
+
+\subsection{上下文管理器和 \texttt{with} 块}
+
+上下文管理器对象存在的目的是管理 \texttt{with} 语句，就像迭代器的存在是为了管理 \texttt{for} 语句一样。
+
+\texttt{with} 语句的目的是简化 \texttt{try/finally} 模式。这种模式用于保证一段代码运行完毕后执行某项操作，即便那段代码由于异常， \texttt{return} 语句或 \texttt{sys.exit()} 调用而中止，也会执行指定的操作。 \texttt{finally} 子句中的代码通常用于释放重要的资源，或者还原临时变量的状态。
+
+上下文管理器协议包含 \texttt{\_\_enter\_\_} 和 \texttt{\_\_exit\_\_} 两个方法。 with 语句开始运行时，会在上下文管理器对象上调用 \texttt{\_\_enter\_\_} 方法。运行结束后调用 \texttt{\_\_exit\_\_} 方法，依次扮演 \texttt{finally} 子句的角色。
+
+最常见的例子是确保关闭文件对象：
+
+\begin{python}
+>>> with open('mirror.py') as fp:   # fp 绑定到打开的文件上，因为文件的 __enter__ 方法返回 self
+...     src = fp.read(60)   # 从 fp 中读取一些数据
+... 
+>>> len(src)    # fp 对象仍可用
+60
+>>> fp.closed, fp.encoding  # 读取 fp 对象的属性
+(True, 'UTF-8')
+>>> fp.read(60)     # 不能进行 I/O 操作，因为 with 块的末尾，文件被关闭了
+Traceback ...
+\end{python}
+
+上面示例的第一行道出了不易察觉但很重要的一点：执行 \texttt{with} 后面的表达式得到的结果是上下文管理器对象，不过，把值绑定到目标变量商是在上下文管理器对象商调用 \texttt{\_\_enter\_\_} 方法的结果。
+
+碰巧，上述示例中的 open() 函数返回 TextUIWrapper 类的实例，而该实例的 \texttt{\_\_enter\_\_} 方法返回 self。不过，\texttt{\_\_enter\_\_} 方法除了会返回上下文管理器之外，还可能返回其他对象。
+
+不管控制流程以哪种方式退出 \texttt{with} 块，都会在上下文管理器对象上调用 \texttt{\_\_exit\_\_} 方法，而不是在 \texttt{\_\_enter\_\_} 方法返回的对象上调用。
+
+\texttt{with} 语句的 \texttt{as} 子句是可选的，对 \texttt{open} 函数来说，必须加上 \texttt{as} 子句，以便获取文件的引用。不过，有些上下文管理器会返回 \texttt{None}，因为没什么有用的对象能提供给用户。
+
+下面是一个精心制作的上下文管理器执行操作，以此强调上下文管理器与 \texttt{\_\_enter\_\_} 方法返回的对象之间的区别。
+
+\begin{python}
+>>> from mirror import LookingGlass
+>>> with LookingGlass() as what:    # 返回结果绑定到 what 上
+...     print('Alice, Kitty and Snowdrop')
+...     print(what) 
+... 
+pordwonS dna yttiK ,ecilA
+YKCOWREBBAJ
+>>> what    # with 执行结束，可以获得 __enter__ 方法的返回值，即存储在 what 变量中的值
+'JABBERWOCKY'
+>>> print('Back to normal.')    # 输出不再是反向
+Back to normal.
+\end{python}
+
+下面是 \texttt{LookingGlass} 类的实现：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/15-3.py}
+
+解释器调用 \texttt{\_\_enter\_\_} 方法时，除了隐式的 \texttt{self} 之外，不会传入任何参数。传给 \texttt{\_\_exit\_\_} 方法的三个参数列举如下：
+
+\begin{itemize}
+    \item \texttt{exc\_type}
+    
+    异常类(例如 \texttt{ZeroDivisionError})
+
+    \item \texttt{exc\_value}
+    
+    异常实例。有时会有参数传给异常构造方法，例如错误消息，这些参数可以使用 \texttt{exc\_value.args} 参数
+
+    \item \texttt{traceback}
+    
+    \texttt{traceback} 对象。
+\end{itemize}
+
+上下文管理器是相当新颖的特性，更多请查阅官方文档。
+
+\subsubsection{\texttt{contextlib} 模块中的实用工具}
+
+自己定义上下文管理器之前，先看一下 Python 标准文档中的 \texttt{contextlib} 内容。 \texttt{contextlib} 模块中有一些类的函数，使用范围十分广泛。
+
+\begin{itemize}
+    \item \texttt{closing}
+    
+    如果对象提供了 \texttt{close()} 方法，但没有实现 \texttt{\_\_exnter\_\_/\_\_exit\_\_} 协议，那么可以使用这个函数构建上下文管理器。
+
+    \item \texttt{suppress}
+    
+    构建临时忽略指定异常的上下文管理器。
+
+    \item \texttt{@contextmanager}
+    
+    这个装饰器把简单的生成器函数变成上下文管理器。这种上下文管理器也能用于装饰函数，在受管理的上下文中运行整个函数。
+
+    \item \texttt{ContextDecorator}
+    
+    这是个基类，用于定义基于类的上下文管理器。这种上下文管理器也能用于装饰函数，在受管理的上下文中运行整个函数。
+
+    \item \texttt{ExitStack}
+    
+    这个上下文管理器能进入多个上下文管理器。 \texttt{with} 块结束时， \texttt{ExitStack} 按照后进先出的顺序调用栈中各个上下文管理器的 \texttt{\_\_exit\_\_} 方法。如果事先不知道 \texttt{with} 块要进入多少个上下文管理器，可以使用这个给类。例如，同时打开任意一个文件列表中的所有文件。
+\end{itemize}
+
+在这些实用工具中，使用最广泛的是 \texttt{@contextmanager} 装饰器。
+
+\subsection{使用 \texttt{@contextmanager}}
+
+\texttt{@contextmanager} 装饰器能减少创建上下文管理器的样板代码量，因为不用编写一个完整的类，定义 \texttt{\_\_enter\_\_} 和 \texttt{\_\_exit\_\_} 方法，而只需实现有一个 yield 语句的生成器，生成想让 \texttt{\_\_enter\_\_} 方法返回的值。
+
+在使用 \texttt{@contextmanager} 装饰的生成器中， \texttt{yield} 语句的作用是把函数的定义分成两部分： \texttt{yield} 语句前面的所有代码在 \texttt{with} 块开始时(即解释器调用 \texttt{\_\_enter\_\_} 方法时)执行，后面的代码在 \texttt{with} 块结束时(即解释器调用 \texttt{\_\_exit\_\_} 方法时)执行。
+
+下面这个例子重新编写了 \texttt{LookingGlass} 类：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/15-5.py}
+
+这个生成器的用法和类没有什么区别。本质上， \texttt{contextlib.contextmanager} 装饰器会把函数包装是实现 \texttt{\_\_enter\_\_} 和 \texttt{\_\_exit\_\_} 方法的类。
+
+这个类的 \texttt{\_\_enter\_\_} 方法有如下作用：
+\begin{enumerate}
+    \item 调用生成器，保存生成器对象(这里称为 \texttt{gen} )。
+    \item 调用 \texttt{next(gen)}，执行到 \texttt{yield} 关键字所在的位置。
+    \item 返回 \texttt{next(gen)} 产出的值，以便把产出的值绑定到 \texttt{with/as} 语句中的目标变量上。
+\end{enumerate}
+
+\texttt{with} 块终止时， \texttt{\_\_exit\_\_} 方法会做以下几件事。
+\begin{enumerate}
+    \item 检查有没有把异常传给 \texttt{exc\_type}; 如果有，调用 \texttt{gen.throw(exception)}, 在生成器函数定义体中包含 \texttt{yield} 关键字的那一行抛出异常。
+    \item 否则，调用 \texttt{next(gen)}, 继续执行生成器函数定义体中 \texttt{yield} 语句之后的代码。
+\end{enumerate}
+
+这样看来，示例 15-5 出了一个严重的错误：如果在 \texttt{with} 块中抛出异常，Python 解释器会将其捕获，然后再 \texttt{looking\_glass} 函数的 \texttt{yield} 表达式中再次抛出。但是，那里没有处理错误的代码，因此 \texttt{looking\_glass} 函数会终止，永远无法恢复成原来的\texttt{ sys.stdout.write} 方法，导致系统处于无效状态。
+
+下面添加一些代码，这样在功能上它就与示例 15-3 中基于类的实例等效了：
+
+\lstinputlisting[language=Python]{../../Scripts/ControlFlow/15-7.py}
+
+前面说过，为了告诉解释器异常已经处理了，\texttt{\_\_exit\_\_} 方法会返回 \texttt{True}，此时解释器会压制异常。如果 \texttt{\_\_exit\_\_} 方法没有显式返回一个值，那么解释器得到的是 \texttt{None}，然后向上冒泡异常。使用 \texttt{@contextmanager} 装饰器时，默认的行为是相反的：装饰器提供的 \texttt{\_\_exit\_\_}方法假定发给生成器的所有异常都得到了处理，因此应该压制异常\footnote{把异常发给生成器的方式是使用 \texttt{throw} 方法，下一章会说明。}。如果不想让 \texttt{@contextmanager} 压制异常，必须在被装饰的函数中显式重新抛出异常。\footnote{这样约定的原因是，创建上下文管理器时，生成器无法返回值，只能产出值。下一章会有更详细讲解。}
+
+使用 \texttt{@contextmanager} 装饰器时，要把 \texttt{yield} 语句放在 \texttt{try/finally} 语句中(或者 \texttt{with} 语句中)，这是无法避免的，因此我们永远不知道上下文管理器中在做什么。
+
+
+
+\newpage
