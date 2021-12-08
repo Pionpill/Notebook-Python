@@ -110,6 +110,9 @@
 \newtheorem{assumption}{\hspace{2em}假设}[section]
 \newtheorem{conditions}{\hspace{2em}条件}[section]
 \newtheorem{property}{\hspace{2em}性质}[section]
+\newtheorem{warning}{\hspace{2em}警告}[section] 
+\newtheorem{tip}{\hspace{2em}提示}[section] 
+\newtheorem{version}{\hspace{2em}兼容}[section]
 
 
 % ========================= 基础格式 =========================
@@ -165,13 +168,14 @@
 \setcounter{tocdepth}{4}
 \numberwithin{equation}{section}
 
-
 \titlecontents{chapter}[2em]{\filcenter \bfseries \zihao{-3} \vspace{10pt}}{\contentslabel{2em}}{\hspace*{-4em}}{~\titlerule*[0.6pc]{$ $}}
 \titlecontents{section}[2em]{\bfseries \zihao{4} \vspace{10pt}}{\contentslabel{2em}}{\hspace*{-4em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
-\titlecontents{subsection}[4em]{\zihao{-4}}{\contentslabel{2em}}{\hspace*{-2em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
-\titlecontents{subsubsection}[7em]{\zihao{-4}}{\contentslabel{3em}}{\hspace*{-2em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
-\titlecontents{paragraph}[11em]{\zihao{5}}{\contentslabel{4em}}{\hspace*{-2em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
+\titlecontents{subsection}[4.5em]{\zihao{-4}}{\contentslabel{2.5em}}{\hspace*{-2em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
+\titlecontents{subsubsection}[7.5em]{\zihao{-4}}{\contentslabel{3em}}{\hspace*{-2em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
+\titlecontents{paragraph}[12em]{\zihao{5}}{\contentslabel{4em}}{\hspace*{-2em}}{~\titlerule*[0.6pc]{$.$}~\contentspage}
 
+% 无视 chapter 计数器
+\counterwithout{section}{chapter}
 % ========== 章节格式 ==========
 \setlength{\parskip}{0.3em}
 \setlength{\parindent}{2em}
@@ -192,7 +196,7 @@
 	section={
 		format={\zihao{-3}\bfseries\heiti\centering},
 		name={,},
-		aftername={\hspace{0pt}},
+		aftername={\hspace{5pt}},
 		number=\arabic{section},
         beforeskip = 2em,
         afterskip = 1em,
