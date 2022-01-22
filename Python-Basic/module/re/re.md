@@ -1,4 +1,4 @@
-<link rel=stylesheet href=../style.css>
+<link rel=stylesheet href=../../style.css>
 <h1> re 包 </h1>
 <h2> 1 Regex 对象与 Match 对象 </h2>
 <h3> 1.1 Regex 对象 </h3>

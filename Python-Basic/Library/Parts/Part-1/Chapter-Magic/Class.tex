@@ -1,0 +1,211 @@
+\section{类相关}
+\subsection{字符串表示}
+\subsubsection{\_\_repr\_\_}
+
+\texttt{\_\_repr\_\_} 是由 \texttt{object} 对象提供的，所有类都会继承这个方法。该方法用于提供一个``自我描述''。当直接打印类的实例化对象时，系统会输出对象的自我描述信息。
+
+如果没有重写该方法，我们使用 \texttt{print()} 打印对象时会返回一个 ``\texttt{xxx object at 0x...}'' 的形式。
+
+此外，\texttt{\_\_repr\_\_} 方法返回的信息应该是面向程序员的。在交互环境下返回的是该方法。
+
+\subsubsection{\_\_str\_\_}
+
+\texttt{\_\_str\_\_} 方法的作用和 \texttt{\_\_repr\_\_} 类似，它是面向用户的，应该更为人性化。
+
+我们在使用 \texttt{print()} 打印对象实例时，如果定义了 \texttt{\_\_str\_\_} 方法，就会采用对应的输出，如果没有，则使用 \texttt{\_\_repr\_\_} 对应的输出，如果两个方法都没有实现，则采用最原始的  ``\texttt{xxx object at 0x...}'' 形式。
+
+此外，\texttt{\_\_str\_\_} 有一个对应的内置函数 \texttt{str()}。 
+
+\subsubsection{\_\_unicode\_\_}
+
+\texttt{\_\_unicode\_\_} 对应的内置函数为 \texttt{unicode()}。\texttt{unicode()} 与 \texttt{str()} 都是 \texttt{basestring} 的子类。不同的是，\texttt{unicode()} 返回值是 \texttt{unicode}，\texttt{str()} 返回值是 \texttt{str}。
+
+如果我们没有定义 \texttt{\_\_unicode\_\_}，\texttt{unicode()} 函数会返回 \texttt{unicode(self.\_\_str\_\_())}。反之不成立。
+
+\subsection{构造相关}
+\subsubsection{\_\_init\_\_}
+
+\texttt{\_\_init\_\_} 是类的构造函数，如果需要创建类的实例，就会调用这个方法。\texttt{\_\_init\_\_} 的第一个参数是 \texttt{self} 指代实例本身，涉及到实例本身成员的方法都需要包含这个参数。 
+
+如果某个类没有定义 \texttt{\_\_init\_\_} ，且它的继承树上的类也没有定义该魔法函数，则他不可以被实例化。 
+
+\subsubsection{\_\_new\_\_}
+
+\texttt{\_\_new\_\_} 实现的是让类去创建实例。
+
+\texttt{\_\_new\_\_} 方法和 \texttt{\_\_init\_\_} 方法作用类似，都是用于构建实例的构造函数。如果两个魔法函数都存在，则调用 \texttt{\_\_new\_\_}，由 \texttt{\_\_new\_\_} 决定是否要调用 \texttt{\_\_init\_\_}。  
+
+可以这样理解: 类的 \texttt{\_\_init\_\_} 负责将类实例化，而在调用它之前，\texttt{\_\_new\_\_} 决定是否要使用 \texttt{\_\_init\_\_} 方法，因为，\texttt{\_\_new\_\_} 除了调用类中的 \texttt{\_\_init\_\_} 方法，还可以调用其他类的构造方法或者工厂函数等。
+
+构建 \texttt{\_\_new\_\_} 方法的注意点:
+\begin{itemize}
+    \item 第一个参数是 \texttt{cls} 代表类，而不是代表实例的 \texttt{self}。
+    \item \texttt{\_\_new\_\_} 方法始终是类的静态方法，无论是否被加上装饰器。 
+\end{itemize}
+
+\subsubsection{\_\_call\_\_}
+
+Python 中，一切皆为对象，函数也是对象，同时也是可调用对象，实例也可以成为可调用对象。可调用对象可以通过 \texttt{callable()} 函数判断。 
+
+如果某个类实现了\texttt{\_\_call\_\_} 方法，那么类的实例可以像函数一样执行。
+
+\subsubsection{\_\_class\_\_}
+
+\texttt{\_\_class\_\_} 的作用是返回实例所属的类，一般不需要实现，仅在 DEBUG 中使用。
+
+\subsection{属性相关}
+\subsubsection{\_\_getattr\_\_}
+
+魔法函数 \texttt{\_\_getattr\_\_} 用于获取属性，它有一个对应的内置方法 \texttt{getattr()}。下面两种语法是等效的:
+\begin{python}
+a.name
+getattr(a,"name")
+\end{python}
+
+当编译器查找某个对象的属性时，会先才用 . 运算符查询 \texttt{\_\_dict\_\_} 表，如果查不到该属性，则调用 \texttt{getattr(a,"attr")} 方法查找属性。若仍然查不到对应的属性，则会报 AttributeError 异常。
+
+除非需要特别处理，一般情况下不需要实现该方法。
+
+\subsubsection{\_\_setattr\_\_}
+
+\texttt{\_\_setattr\_\_} 用于给属性赋值，下面两种写法等效:
+\begin{python}
+x.y = v
+setattr(x,'y',v)
+\end{python}
+
+我们在使用第一种方式为实例的属性赋值时，实际上就是调用了 \texttt{\_\_setattr\_\_} 方法。 
+
+除非需要特别处理，一般情况下不需要实现该方法。
+
+\subsubsection{\_\_getattribute\_\_}
+
+\texttt{\_\_getattr\_\_} 是作为取属性的最后方案存在的，而 \texttt{\_\_getattribute\_\_} 则是用于取属性时拦截，当属性被访问时，将自动调用该方法。因此常用于实现一些访问某属性时执行一段代码的特性。
+
+注意，在访问属性时，最先调用 \texttt{\_\_getattribute\_\_} 执行对应的代码，其次再有可能获取 \texttt{\_\_dict\_\_} 表，最后可能调用 \texttt{\_\_getattr\_\_} 方法。 
+
+\subsubsection{\_\_dir\_\_}
+
+\texttt{\_\_dir\_\_} 对应的内置函数为 \texttt{dir()}，它会返回实例的所有属性和方法。调用对象的 \texttt{\_\_dir\_\_} 方法和使用内置函数 \texttt{dir()} 返回的列表是相同的，顺序有可能不同。
+
+有别于 \texttt{\_\_dict\_\_}，仅会获取一部分实例成员，\texttt{dir()} 会获取所有(包括父级)的成员。 详细区别请参考 \texttt{\_\_dict\_\_} 小节。 
+
+\subsubsection{\_\_delattr\_\_}
+
+魔法函数 \texttt{\_\_delattr\_\_} 对应的内置函数为 \texttt{delattr()}，用于删除对象的某个属性。该魔法函数一般无被重写。
+\begin{python}
+delattr(object,attribute)
+\end{python}
+
+\subsubsection{\_\_del\_\_}
+
+魔法函数 \texttt{\_\_del\_\_} 用于销毁对象，其对应的内置函数为 \texttt{del()}。在开发者编程过程中，很少会直接销毁对象，因为 Python 能很好地自动完成垃圾回收工作。但无论是手动还是自动销毁对象，都会调用对象的 \texttt{\_\_del\_\_} 方法。
+
+重写 \texttt{\_\_del\_\_} 对象的主要目的是像 C++ 的析构函数，做一些终端提示等工作。
+
+\subsubsection{\_\_all\_\_}
+
+魔法函数 \texttt{\_\_all\_\_} 的主要作用是在 \texttt{from <module> import *} 语句中暴露接口。
+
+不像 Java，C++ 等 OOP 高级语句，Python 语言没有原生的可见性控制，而是靠一套"约定"下工作。比如下划线开头的属性/方法应该对应外部不可见。\texttt{\_\_all\_\_} 提供了暴露接口的白名单，一些不以下划线开头的变量(比如从其他模块导入的变量)也将被排除出去。
+
+\noindent\textbf{书写 \texttt{\_\_all\_\_} 的好处有如下:}
+\begin{itemize}
+    \item \textbf{控制 \texttt{import *} 的形为}
+    
+    书写了 \texttt{\_\_all\_\_} 之后，\texttt{import *} 只会导入 \texttt{\_\_all\_\_} 中列出的成员。如果成员不存在，则会抛出异常。
+
+    \item \textbf{代码检查}
+    
+    有些严格的代码检查工具，如果某个属性/方法被导入却没有应用则会报错，而我们在构建包的时候需要导出对应方法/属性，则可以在 \texttt{\_\_all\_\_} 中加入对应方法/属性，就不会再报错了。
+
+    \item \textbf{提供接口}
+    
+    书写了 \texttt{\_\_all\_\_} 之后，能让模块的使用者清晰地区分哪些是具体的实现方法，哪些是可以调用的接口。
+\end{itemize}
+
+\noindent\textbf{定义 \texttt{\_\_all\_\_} 需要注意的地方}
+
+\begin{itemize}
+    \item \texttt{\_\_all\_\_} 是 \texttt{list} 类型的。
+    \item 不应该动态生成 \texttt{\_\_all\_\_}。
+    \item 按照 PEP8 建议， \texttt{\_\_all\_\_} 应该写在所有 \texttt{import} 语句下面，成员上面。
+\end{itemize}
+
+\subsubsection{\_\_dict\_\_}
+
+魔法函数 \texttt{\_\_dict\_\_} 用于存储类或实例的成员信息。它并不能直接在类中书写，但程序运行时任何属性/方法的调用都涉及到 \texttt{\_\_dict\_\_}，作为开发者 \texttt{\_\_dict\_\_} 的主要作用是 DEBUG，和它相关的内置函数为 \texttt{dir()}。  
+
+\noindent\textbf{\texttt{\_\_dict\_\_} 属性:}
+
+该函数是用来存储对象成员的一个字典，键为属性名，值为属性值。在类和实例中的 \texttt{\_\_dict\_\_} 有所不同:
+\begin{itemize}
+    \item \textbf{类中的 \texttt{\_\_dict\_\_}}  
+    
+    类中的 \texttt{\_\_dict\_\_} 主要存储共享的变量和函数(包括静态成员等)，类的 \texttt{\_\_dict\_\_} 并不包含父类的属性。
+
+    在类定义中的 \texttt{cls} 是指类本身，通过它调用的成员都是类的 \texttt{\_\_dict\_\_} 中的成员。
+    
+    \item \textbf{实例中的 \texttt{\_\_dict\_\_}}
+    
+    实例中的 \texttt{\_\_dict\_\_} 仅存储与实例相关的实例属性。每个实例的属性各不影响。
+    
+    在类定义中的 \texttt{self} 是指实例。
+\end{itemize} 
+
+\noindent\textbf{\texttt{dir()} 函数}
+
+\texttt{dir()} 函数是 Python 提供的一个 API 函数，该函数会自动寻找一个对象的所有属性(包括父类中继承的属性)。
+
+一个实例的 \texttt{\_\_dict\_\_} 属性仅仅是那个实例的实例属性的集合，并不是该实例的所有有效属性。所以要找一个对象的所有有效属性应该使用 \texttt{dir}。
+
+\texttt{\_\_dict\_\_} 是 \texttt{dir()} 的子集。
+
+\subsubsection{\_\_slots\_\_}
+
+Python 类的实例往往会在程序运行过程中增加成员，这使得我们可以非常灵活地使用实例对象。但如果某个实例的成员过多，在运行过程中维护它的 \texttt{\_\_dict\_\_} 字典表会消耗大量的内存。这时我们就可以使用 \texttt{\_\_slots\_\_} 魔法函数保存固定的属性，优化内存。
+
+\texttt{\_\_slots\_\_} 一般写法如下:
+\begin{python}
+__slots__ = ['name', 'identifier']
+\end{python}
+
+在书写 \texttt{\_\_slots\_\_} 时需要注意以下几项:
+\begin{itemize}
+    \item 一般使用列表来保存属性，也可以使用集合等。
+    \item 不要乱用这个魔法函数，只有实例属性上千时使用才有显著的优化效果。
+\end{itemize}
+
+\subsection{属性描述符}
+\subsubsection{\_\_get\_\_}
+
+
+
+\subsubsection{\_\_set\_\_}
+\subsubsection{\_\_delete\_\_}
+
+\subsection{序列相关}
+\subsubsection{\_\_len\_\_}
+\subsubsection{\_\_getitem\_\_}
+\subsubsection{\_\_setitem\_\_}
+\subsubsection{\_\_delitem\_\_}
+\subsubsection{\_\_contains\_\_}
+
+\subsection{迭代相关}
+\subsubsection{\_\_iter\_\_}
+\subsubsection{\_\_next\_\_}
+
+\subsection{其他}
+\subsubsection{\_\_version\_\_}
+
+PEP8 鼓励使用的魔法函数，用于保存模块版本，但很少有人提及。json 包中这样写到:
+\begin{python}
+__version__ = '2.0.9'
+\end{python}
+
+\subsubsection{\_\_author\_\_}
+
+同样是 PEP8 鼓励使用的魔法函数，用于保存包作者信息。json 包中这样写到:
+\begin{python}
+__author__ = 'Bob Ippolito <bob@redivi.com>'
+\end{python}

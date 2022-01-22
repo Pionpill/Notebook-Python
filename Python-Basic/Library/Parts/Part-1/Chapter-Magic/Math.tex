@@ -1,0 +1,174 @@
+\chapter{魔法函数}
+\section{数学相关}
+\subsection{一元运算符}
+
+\subsubsection{\texttt{\_\_neg\_\_}(-)}
+
+\texttt{\_\_neg\_\_} 用于获取负数，没什么好说的，注意他不是减法运算。
+
+\subsubsection{\texttt{\_\_pos\_\_}(+)}
+
+\texttt{\_\_pos\_\_} 用于获取正数，没什么好说的，注意他不是加法运算。
+
+\subsubsection{\texttt{\_\_abs\_\_}}
+
+\texttt{\_\_abs\_\_} 用于获取绝对值，对应的内置函数为 \texttt{abs}.
+
+\subsection{二元运算符}
+
+这里所有的二元运算符都是比较运算符。
+
+\subsubsection{\texttt{\_\_lt\_\_}(<)}
+
+\texttt{\_\_lt\_\_} 用于实现小于比较。
+
+\subsubsection{\texttt{\_\_le\_\_}(<=)}
+
+\texttt{\_\_le\_\_} 用于实现小于等于比较。
+
+\subsubsection{\texttt{\_\_eq\_\_}(==)}
+
+\texttt{\_\_eq\_\_} 用于实现等于比较。
+
+\subsubsection{\texttt{\_\_ne\_\_}(!=)}
+
+\texttt{\_\_ne\_\_} 用于实现不等比较。
+
+\subsubsection{\texttt{\_\_gt\_\_}(>)}
+
+\texttt{\_\_gt\_\_} 用于实现大于比较。
+
+\subsubsection{\texttt{\_\_ge\_\_}(>=)}
+
+\texttt{\_\_ge\_\_} 用于实现大于等于比较。
+
+\subsection{算数运算符}
+
+\subsubsection{\texttt{\_\_add\_\_}(+)}
+
+\texttt{\_\_add\_\_} 用于实现加法运算。
+
+\subsubsection{\texttt{\_\_sub\_\_}(-)}
+
+\texttt{\_\_sub\_\_} 用于实现减法运算。
+
+\subsubsection{\texttt{\_\_mul\_\_}(*)}
+
+\texttt{\_\_mul\_\_} 用于实现乘法运算。
+
+\subsubsection{\texttt{\_\_truediv\_\_}(/)}
+
+\texttt{\_\_truediv\_\_} 用于实现除法运算。注意这里是数学意义上的除法运算:
+\begin{python}
+>>> 3/2
+1.5
+\end{python}
+
+\subsubsection{\texttt{\_\_floordiv\_\_}(//)}
+
+\texttt{\_\_floordiv\_\_} 用于实现整除运算。
+
+\subsubsection{\texttt{\_\_mod\_\_}(\%)}
+
+\texttt{\_\_mod\_\_} 用于实现取模运算。
+
+\subsubsection{\texttt{\_\_divmod\_\_}}
+
+\texttt{\_\_divmod\_\_} 用于除法运算，对应内置函数 \texttt{divmod(x,y)}:
+\begin{python}
+>>> help(divmod)
+divmod(x, y, /)
+    Return the tuple (x//y, x%y).  Invariant: div*y + mod == x.
+\end{python}
+
+\subsubsection{\texttt{\_\_pow\_\_}(**)}
+
+\texttt{\_\_pow\_\_} 用于实现幂运算，对应内置函数为 \texttt{pow(x,y)}，对应运算符为 **。
+
+\subsubsection{\texttt{\_\_round\_\_}}
+
+\texttt{\_\_round\_\_} 用于实现内置函数 \texttt{round(number, ndigits)}。\texttt{round()} 函数在基本数值类型运算中起到四舍五入的作用。
+
+\subsection{位运算符}
+
+\subsubsection{\texttt{\_\_invert\_\_}(\textasciitilde)}
+
+\texttt{\_\_invert\_\_} 用于实现取反运算。
+
+\subsubsection{\texttt{\_\_lshift\_\_}(<<)}
+
+\texttt{\_\_lshift\_\_} 用于实现左移运算。
+
+\subsubsection{\texttt{\_\_rshift\_\_}(>>)}
+
+\texttt{\_\_rshift\_\_} 用于实现右移运算。
+
+\subsubsection{\texttt{\_\_and\_\_}(\&)}
+
+\texttt{\_\and\_\_} 用于实现与运算。
+
+\subsubsection{\texttt{\_\_or\_\_}(|)}
+
+\texttt{\_\_or\_\_} 用于实现或运算。
+
+\subsubsection{\texttt{\_\_xor\_\_}(\^{})}
+
+\texttt{\_\_xor\_\_} 用于实现非运算。
+
+\subsection{反向与增量运算符}
+
+\subsubsection{反向运算符的规则}
+反向算数运算符即:将算术运算的两个主要参数调换位置进行运算。如果是相同数据类型，那么反向算数运算可以直接委托给正向运算函数。
+
+\begin{python}
+def __add__(self, other):
+    pairs = itertools.zip_longest(self, other, fillvalue = 0.0)
+    return Vector(a + b for a,b in pairs)
+
+def __radd__(self, other):
+    return self + other     # 直接委托给 __add__
+\end{python}
+
+此外，Python 有一个规定：如果由于类型不兼容而导致运算符特殊方法无法返回有效的结果，那么应该返回NotImplemented，而不是抛出TypeError。返回NotImplemented 时，另一个操作数所属的类型还有机会执行运算，即Python 会尝试调用反向方法。
+
+这也就要求我们在正向运算符中尝试捕获 TypeError 错误并返回 NotImplemented 错误:
+
+\begin{python}
+def __add__(self, other):
+    try:
+        pairs = itertools.zip_longest(self, other, fillvalue = 0.0)
+        return Vector(a + b for a,b in pairs)
+    except TypeError:
+        return NotImplemented
+\end{python}
+
+\subsubsection{运算表}
+
+\begin{table}[H]
+    \centering
+    \caption{中缀运算符方法名}
+    \label{table:中缀运算符方法名}
+    \setlength{\tabcolsep}{2mm}
+    \begin{tabular}{l|llll}
+        \toprule
+        \textbf{运算符} & \textbf{正向方法} & \textbf{反向方法} & \textbf{就地方法} & \textbf{说明} \\
+        \midrule
+        \texttt{+}  & \texttt{\_\_add\_\_} & \texttt{\_\_radd\_\_} & \texttt{\_\_iadd\_\_} & 加法或拼接 \\
+        \texttt{-}  & \texttt{\_\_sub\_\_} & \texttt{\_\_rsub\_\_} & \texttt{\_\_isub\_\_} & 减法\\
+        \texttt{*}  & \texttt{\_\_mul\_\_} & \texttt{\_\_rmul\_\_} & \texttt{\_\_imul\_\_} & 乘法或重复复制\\
+        \texttt{/}  & \texttt{\_\_truediv\_\_} & \texttt{\_\_rtruediv\_\_} & \texttt{\_\_itruediv\_\_} & 除法\\
+        \texttt{//} & \texttt{\_\_floordiv\_\_} & \texttt{\_\_rfloordiv\_\_} & \texttt{\_\_ifloordiv\_\_} & 整除\\
+        \texttt{\%} & \texttt{\_\_mod\_\_} & \texttt{\_\_rmod\_\_} & \texttt{\_\_imod\_\_} & 取余\\
+        \texttt{divmod()} & \texttt{\_\_divmod\_\_} & \texttt{\_\_rdivmod\_\_} & \texttt{\_\_idivmod\_\_} & 商和模组成的元组\\
+        \texttt{**, pow()} & \texttt{\_\_pow\_\_} & \texttt{\_\_rpow\_\_} & \texttt{\_\_ipow\_\_} & 幂运算\\
+        \texttt{@} & \texttt{\_\_matmul\_\_} & \texttt{\_\_rmatmul\_\_} & \texttt{\_\_imatmul\_\_} & 矩阵乘法\\
+        \texttt{\&} & \texttt{\_\_and\_\_} & \texttt{\_\_rand\_\_} & \texttt{\_\_iand\_\_} & 位与\\
+        \texttt{|} & \texttt{\_\_or\_\_} & \texttt{\_\_ror\_\_} & \texttt{\_\_ior\_\_} & 位或\\
+        \texttt{\^} & \texttt{\_\_xor\_\_} & \texttt{\_\_rxor\_\_} & \texttt{\_\_ixor\_\_} & 位异或\\
+        \texttt{<<} & \texttt{\_\_lshift\_\_} & \texttt{\_\_rlshift\_\_} & \texttt{\_\_ilshift\_\_} & 按位左移\\
+        \texttt{>>} & \texttt{\_\_rshift\_\_} & \texttt{\_\_rrshift\_\_} & \texttt{\_\_irshift\_\_} & 按位右移\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\newpage

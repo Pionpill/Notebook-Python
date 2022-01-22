@@ -277,3 +277,7 @@ TSWLatexianTemp*
 
 # 绘图库，太大了，不上传
 plotly
+
+.ipynb_checkpoints
+
+*temp*

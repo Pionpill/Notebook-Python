@@ -1,0 +1,100 @@
+\chapter{文件库}
+\section{Json}
+
+Json 模块是用于读写 json 文件的一个轻量的标准模块。导入方式及内容如下:
+
+\begin{python}
+>>> import json
+>>> dir(json)
+['JSONDecodeError', 'JSONDecoder', 'JSONEncoder', '__all__', '__author__', '__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__path__', '__spec__', '__version__', '_default_decoder', '_default_encoder', 'codecs', 'decoder', 'detect_encoding', 'dump', 'dumps', 'encoder', 'load', 'loads', 'scanner']
+>>> json.__all__
+['dump', 'dumps', 'load', 'loads', 'JSONDecoder', 'JSONDecodeError', 'JSONEncoder']
+\end{python}
+
+\subsection{基础用法}
+
+Json 标准库主要提供了四个方法: \texttt{dumps, dump, loads, load} 其中，\texttt{dumps, loads} 函数不涉及文件，\texttt{dump, load} 涉及文件。
+
+\subsubsection{\texttt{dumps, dumps}}
+
+\texttt{dump} 与 \texttt{dumps} 函数用于对 Python 对象进行序列化。将一个 Python 对象序列化为 JSON 格式的编码。
+
+\texttt{dump} 函数定义:
+\begin{python}
+dump(obj, fp, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, sort_keys=False, **kw)
+\end{python}
+
+其中各个参数的意义如下:
+\begin{itemize}
+    \item \textbf{obj}: 要序列化的对象
+    \item \textbf{fp}: 文件描述符，将序列化的 str 保存到文件中。
+    \item skipkeys: 默认为 False，若为 True，则跳过非基本类型的 dict 键。
+    \item ensure\_ascii: 默认为 True，将所有传入的非 ASCII 字符转义输出，False 则原样输出。
+    \item check\_circular: 默认为 True，若为 False 则跳过对容器类型的循环引用检查。
+    \item allow\_nan: 默认为 True，如果为 False 则严格遵守 JSON 规范，引发一些错误，若为 True，则使用错误对象的  JavaScript 等效值。
+    \item indent: 缩进格式，默认最紧凑的方式缩进。
+    \item separators: 去除分隔符后面的空格。
+    \item default: 如果无法序列化，调用对应函数处理。
+    \item sort\_key: 如果为 True，则输出按键值排序。
+\end{itemize}
+
+\texttt{dumps} 函数定义 
+\begin{python}
+dumps(obj, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, sort_keys=False, **kw)
+\end{python}
+
+\texttt{dumps} 函数除了没有参数 \texttt{fp} 其他和 \texttt{dump} 函数相同。
+
+\subsubsection{\texttt{load, loads}}
+
+\texttt{load, loads} 函数使用反序列的方法将 json 对象解码为 python 对象。
+
+\texttt{load} 函数如下:
+
+\begin{python}
+load(fp, *, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)
+\end{python}
+
+其中各个参数意义如下:
+
+\begin{itemize}
+    \item \textbf{fp}: 文件描述符。
+    \item object\_hook: 可选函数，用于实现自定义解码器。指定一个函数，该函数负责把反序列化后的基本类型对象转换成自定义类型的对象。
+    \item parse\_float: 用于对 float 字符串进行解码。
+    \item parse\_int: 用于对 int 字符串进行解码。
+    \item parse\_constant: 用于对 -Infinity Infinity NaN 字符串进行调用。
+    \item object\_pairs\_hook: 可选函数，暂时不知道干什么的。
+\end{itemize}
+
+\texttt{loads} 函数如下:
+
+\begin{python}
+loads(s, *, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)
+\end{python}
+
+其中部分参数意义如下:
+\begin{itemize}
+    \item \textbf{s}: 将 s(包含 JSON 文档的 str,bytes,bytearray 实例) 反序列化为 Python 对象。
+\end{itemize}
+
+\subsection{转换规则}
+
+Python 原始类型向 Json 类型的转换对照表如下:
+\begin{table}[H]
+    \centering
+    \caption{json 转换表}
+    \label{table:json 转换表}
+    \setlength{\tabcolsep}{10mm}
+    \begin{tabular}{c|c}
+        \toprule
+        \textbf{Python} & \textbf{Json} \\
+        \midrule
+        dict & object \\
+        list,tuple & array \\
+        str,unicode & string \\
+        int,long,float & number \\
+        True/False & true/false \\
+        None & null \\
+        \bottomrule
+    \end{tabular}
+\end{table}
